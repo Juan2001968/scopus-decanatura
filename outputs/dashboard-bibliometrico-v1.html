@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Bibliométrico · División de Ciencias Básicas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:#f1f5f9;
+  color:#1e293b;
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:264px 1fr;
+}
+:root{
+  --b1:#2563eb;--b1l:#dbeafe;--b1d:#1d4ed8;
+  --b2:#059669;--b2l:#d1fae5;--b2d:#047857;
+  --q1:#16a34a;--q2:#2563eb;--q3:#d97706;--q4:#dc2626;--qna:#94a3b8;
+  --sid-a:#1e1b4b;--sid-b:#312e81;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);
+  --r:12px;--tr:200ms cubic-bezier(.4,0,.2,1);
+}
+
+/* ── SIDEBAR ── */
+#sidebar{
+  background:linear-gradient(155deg,var(--sid-a) 0%,var(--sid-b) 100%);
+  min-height:100vh;height:100vh;
+  position:sticky;top:0;overflow-y:auto;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;
+}
+.sb-brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-icon{
+  width:34px;height:34px;border-radius:8px;
+  background:linear-gradient(135deg,#818cf8,#6366f1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;margin-bottom:8px
+}
+.sb-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;font-weight:700;color:#fff;line-height:1.3}
+.sb-sub{font-size:10.5px;color:rgba(255,255,255,.45);margin-top:2px}
+.sb-nav{padding:10px 10px 0}
+.nav-lbl{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.3);padding:8px 8px 4px}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 10px;border-radius:8px;
+  color:rgba(255,255,255,.6);font-size:12.5px;font-weight:500;
+  cursor:pointer;transition:all var(--tr);margin-bottom:1px
+}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.14);color:#fff}
+.nav-icon{width:16px;text-align:center;font-size:13px}
+.sb-filters{padding:14px 14px;border-top:1px solid rgba(255,255,255,.08);flex:1}
+.f-section{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.3);margin-bottom:10px}
+.f-label{display:block;font-size:10.5px;font-weight:500;color:rgba(255,255,255,.5);margin-bottom:5px;margin-top:12px}
+.f-label:first-of-type{margin-top:0}
+.block-toggles{display:flex;flex-direction:column;gap:5px}
+.block-toggle{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:8px;
+  border:1.5px solid rgba(255,255,255,.1);
+  cursor:pointer;transition:all var(--tr);
+  background:rgba(255,255,255,.03)
+}
+.block-toggle:hover{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.07)}
+.block-toggle.act-b1{border-color:var(--b1);background:rgba(37,99,235,.2)}
+.block-toggle.act-b2{border-color:var(--b2);background:rgba(5,150,105,.2)}
+.b-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.b-name{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.85);line-height:1.3}
+.b-dept{font-size:9.5px;color:rgba(255,255,255,.38);margin-top:1px}
+.f-select{
+  width:100%;padding:7px 28px 7px 10px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;color:rgba(255,255,255,.8);
+  font-size:11.5px;font-family:'Inter',sans-serif;
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' opacity='0.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+  transition:all var(--tr)
+}
+.f-select:focus{outline:none;border-color:rgba(255,255,255,.28);background-color:rgba(255,255,255,.1)}
+.f-select option{background:#1e1b4b;color:#fff}
+.f-anim{overflow:hidden;max-height:0;opacity:0;transition:max-height .38s ease,opacity .28s ease}
+.f-anim.vis{max-height:240px;opacity:1}
+.btn-reset{
+  width:100%;padding:8px;margin-top:12px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;color:rgba(255,255,255,.55);font-size:11.5px;font-weight:500;
+  cursor:pointer;transition:all var(--tr);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  font-family:'Inter',sans-serif
+}
+.btn-reset:hover{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)}
+.sb-foot{padding:10px 14px;border-top:1px solid rgba(255,255,255,.06);font-size:9.5px;color:rgba(255,255,255,.22);text-align:center;line-height:1.6}
+
+/* ── MAIN ── */
+#main{background:#f1f5f9;overflow-y:auto;min-height:100vh}
+.top-bar{
+  background:#fff;border-bottom:1px solid #e2e8f0;
+  padding:11px 22px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:90
+}
+.breadcrumb{display:flex;align-items:center;gap:5px;font-size:12px;color:#64748b}
+.breadcrumb .sep{color:#cbd5e1}
+.breadcrumb .cur{color:#1e293b;font-weight:600}
+.hdr-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.f-chip{
+  display:flex;align-items:center;gap:4px;
+  padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:500;border:1px solid
+}
+.f-chip.b1{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.f-chip.b2{background:#d1fae5;color:#065f46;border-color:#a7f3d0}
+.f-chip.neu{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
+.btn-export{
+  padding:6px 13px;background:#1e1b4b;color:#fff;border:none;
+  border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;
+  font-family:'Inter',sans-serif;display:flex;align-items:center;gap:4px;
+  transition:background var(--tr)
+}
+.btn-export:hover{background:#312e81}
+
+/* ── CONTENT ── */
+.content{padding:18px 22px 30px}
+.ctx-banner{
+  background:#fff;border-radius:10px;padding:13px 16px;
+  margin-bottom:16px;display:flex;align-items:center;gap:12px;
+  border-left:4px solid #6366f1;box-shadow:var(--shadow);
+  transition:border-color var(--tr)
+}
+.ctx-banner.b1{border-left-color:var(--b1)}
+.ctx-banner.b2{border-left-color:var(--b2)}
+.ctx-icon{font-size:20px}
+.ctx-title{font-size:13.5px;font-weight:700;color:#1e293b}
+.ctx-sub{font-size:11.5px;color:#64748b;margin-top:1px}
+.ctx-meta{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap}
+.meta-chip{padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600;background:#f1f5f9;color:#475569}
+
+/* ── KPI ROW ── */
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+.kpi-card{
+  background:#fff;border-radius:var(--r);padding:15px 14px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;
+  transition:transform var(--tr),box-shadow var(--tr)
+}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.1)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi-card.c-blue::before{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+.kpi-card.c-violet::before{background:linear-gradient(90deg,#7c3aed,#a78bfa)}
+.kpi-card.c-green::before{background:linear-gradient(90deg,#059669,#34d399)}
+.kpi-card.c-amber::before{background:linear-gradient(90deg,#d97706,#fbbf24)}
+.kpi-card.c-rose::before{background:linear-gradient(90deg,#dc2626,#fb7185)}
+.kpi-card.c-indigo::before{background:linear-gradient(90deg,#4f46e5,#818cf8)}
+.kpi-ico{font-size:17px;margin-bottom:7px}
+.kpi-val{font-size:25px;font-weight:800;color:#1e293b;line-height:1;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:-.5px}
+.kpi-lbl{font-size:10.5px;font-weight:500;color:#64748b;margin-top:4px;line-height:1.3}
+.kpi-delta{font-size:10px;font-weight:600;margin-top:3px;display:inline-flex;align-items:center;gap:2px}
+.kpi-delta.up{color:#16a34a}.kpi-delta.neu{color:#64748b}
+
+/* ── CHARTS ROW ── */
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:16px}
+.card{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.card-hdr{padding:14px 16px 10px;border-bottom:1px solid #f1f5f9}
+.card-title{font-size:12.5px;font-weight:700;color:#1e293b;font-family:'Plus Jakarta Sans',sans-serif}
+.card-sub{font-size:10.5px;color:#94a3b8;margin-top:2px}
+.card-body{padding:14px 16px}
+.chart-tab{
+  padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+  border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;
+  cursor:pointer;font-family:'Inter',sans-serif;transition:all var(--tr)
+}
+.chart-tab.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
+.chart-legend{display:flex;gap:12px;margin-top:8px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#64748b}
+.leg-dot{width:8px;height:8px;border-radius:50%}
+
+/* ── DONUT ── */
+.donut-wrap{display:flex;flex-direction:column;align-items:center;padding:6px 0}
+.donut-ring{position:relative;width:136px;height:136px}
+.donut-face{position:absolute;width:100%;height:100%;border-radius:50%}
+.donut-hole{
+  position:absolute;width:78px;height:78px;background:#fff;border-radius:50%;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center
+}
+.donut-pct{font-size:18px;font-weight:800;color:#1e293b;font-family:'Plus Jakarta Sans',sans-serif;line-height:1}
+.donut-lbl-c{font-size:8.5px;color:#94a3b8;font-weight:500;margin-top:1px}
+.donut-legend{margin-top:12px;width:100%}
+.dl-item{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#475569;padding:3px 0}
+.dl-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.dl-bar{flex:1;height:4px;border-radius:2px;background:#f1f5f9;overflow:hidden}
+.dl-fill{height:100%;border-radius:2px;transition:width .4s ease}
+.dl-cnt{font-size:11px;font-weight:600;color:#1e293b;min-width:28px;text-align:right}
+
+/* ── BOTTOM ROW ── */
+.bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rank-table{width:100%;border-collapse:collapse}
+.rank-table th{
+  font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  color:#94a3b8;padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:left
+}
+.rank-table th:nth-child(n+3){text-align:right}
+.rank-table td{padding:8px;font-size:11.5px;color:#374151;border-bottom:1px solid #f8fafc;vertical-align:middle}
+.rank-table tr:last-child td{border-bottom:none}
+.rank-table tr:hover td{background:#fafbff}
+.rn{
+  width:22px;height:22px;border-radius:5px;background:#f1f5f9;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#475569
+}
+.rn.gold{background:#fef3c7;color:#d97706}
+.rn.silver{background:#f8fafc;color:#94a3b8}
+.rn.bronze{background:#fde8d8;color:#c2410c}
+.r-name-cell{display:flex;align-items:center;gap:7px}
+.r-dept-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.r-name{font-weight:600;color:#1e293b;font-size:11.5px}
+.r-dept{font-size:9.5px;color:#94a3b8}
+.qpill{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700}
+.qpill.Q1{background:#dcfce7;color:#16a34a}
+.qpill.Q2{background:#dbeafe;color:#1d4ed8}
+.qpill.Q3{background:#fef3c7;color:#d97706}
+.qpill.Q4{background:#fee2e2;color:#dc2626}
+.qpill.NA{background:#f1f5f9;color:#94a3b8}
+.sort-sel{
+  font-size:10.5px;border:1px solid #e2e8f0;border-radius:6px;
+  padding:3px 7px;color:#475569;background:#f8fafc;font-family:'Inter',sans-serif;cursor:pointer
+}
+
+/* ── ANNUAL BARS ── */
+.ann-chart{display:flex;align-items:flex-end;gap:4px;height:130px;padding:0 2px}
+.ann-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+.ann-bar-wrap{flex:1;display:flex;align-items:flex-end;width:100%}
+.ann-bar{
+  width:100%;border-radius:3px 3px 0 0;position:relative;cursor:pointer;
+  min-height:2px;
+  transition:height .4s cubic-bezier(.4,0,.2,1),background .3s
+}
+.ann-bar:hover{filter:brightness(1.12)}
+.ann-yr{font-size:8.5px;color:#94a3b8;margin-top:3px;flex-shrink:0}
+.tipo-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.tipo-lbl{font-size:11px;color:#475569;min-width:74px}
+.tipo-track{flex:1;height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.tipo-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.tipo-val{font-size:11px;font-weight:600;color:#1e293b;min-width:28px;text-align:right}
+
+/* ── MISC ── */
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(241,245,249,.65);
+  display:flex;align-items:center;justify-content:center;z-index:1000;
+  backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .18s
+}
+.loading-overlay.vis{opacity:1;pointer-events:all}
+.spinner{
+  width:34px;height:34px;border:3px solid #e2e8f0;border-top-color:#4f46e5;
+  border-radius:50%;animation:spin .7s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.ani{animation:fadeUp .28s ease forwards}
+.tooltip-box{
+  position:fixed;background:#1e293b;color:#fff;font-size:11px;font-weight:500;
+  padding:5px 9px;border-radius:6px;pointer-events:none;z-index:500;
+  display:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2)
+}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+<div class="tooltip-box" id="tooltip"></div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-icon">📊</div>
+    <div class="sb-title">Monitor Bibliométrico</div>
+    <div class="sb-sub">División de Ciencias Básicas · 2014–2025</div>
+  </div>
+
+  <nav class="sb-nav">
+    <div class="nav-lbl">Vistas</div>
+    <div class="nav-item active" onclick="setView(this,'Visión General')">
+      <span class="nav-icon">🏠</span><span>Visión General</span>
+    </div>
+    <div class="nav-item" onclick="setView(this,'Producción Científica')">
+      <span class="nav-icon">📈</span><span>Producción</span>
+    </div>
+    <div class="nav-item" onclick="setView(this,'Calidad de Fuente')">
+      <span class="nav-icon">⭐</span><span>Calidad de Fuente</span>
+    </div>
+    <div class="nav-item" onclick="setView(this,'Análisis de Impacto')">
+      <span class="nav-icon">🔥</span><span>Impacto</span>
+    </div>
+    <div class="nav-item" onclick="setView(this,'Colaboración y Temáticas')">
+      <span class="nav-icon">🌐</span><span>Colaboración</span>
+    </div>
+  </nav>
+
+  <div class="sb-filters">
+    <div class="f-section">Filtros</div>
+
+    <span class="f-label">Bloque Departamental</span>
+    <div class="block-toggles">
+      <div class="block-toggle" id="tog-b1" onclick="selectBlock('b1')">
+        <div class="b-dot" style="background:var(--b1)"></div>
+        <div>
+          <div class="b-name">Bloque 1</div>
+          <div class="b-dept">Matemáticas · Estadística · C.Datos</div>
+        </div>
+      </div>
+      <div class="block-toggle" id="tog-b2" onclick="selectBlock('b2')">
+        <div class="b-dot" style="background:var(--b2)"></div>
+        <div>
+          <div class="b-name">Bloque 2</div>
+          <div class="b-dept">Física · Biología · Química</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="f-anim" id="wrap-subarea">
+      <span class="f-label">Sub-área</span>
+      <select class="f-select" id="sel-subarea" onchange="onSubarea()">
+        <option value="">Todas las sub-áreas</option>
+      </select>
+    </div>
+
+    <div class="f-anim" id="wrap-prof">
+      <span class="f-label">Profesor / Investigador</span>
+      <select class="f-select" id="sel-prof" onchange="onProf()">
+        <option value="">Todos los profesores</option>
+      </select>
+    </div>
+
+    <span class="f-label">Tipo documental</span>
+    <select class="f-select" id="sel-tipo" onchange="refresh()">
+      <option value="">Todos</option>
+      <option value="article">Artículos</option>
+      <option value="review">Revisiones</option>
+      <option value="conference">Conferencias</option>
+    </select>
+
+    <button class="btn-reset" onclick="resetAll()">↺ Limpiar filtros</button>
+  </div>
+
+  <div class="sb-foot">Datos Scopus · ETL PostgreSQL<br>Actualizado: mayo 2026 · v1.0</div>
+</aside>
+
+<!-- MAIN -->
+<main id="main">
+  <div class="top-bar">
+    <div class="breadcrumb">
+      <span>División de Ciencias Básicas</span>
+      <span class="sep">›</span>
+      <span id="bc-cur" class="cur">Visión General</span>
+    </div>
+    <div class="hdr-actions">
+      <div id="chips" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      <button class="btn-export" onclick="exportCSV()">↓ Exportar CSV</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Context banner -->
+    <div class="ctx-banner" id="ctx-banner">
+      <div class="ctx-icon">🏛️</div>
+      <div>
+        <div class="ctx-title" id="ctx-title">División de Ciencias Básicas — Visión General</div>
+        <div class="ctx-sub" id="ctx-sub">19 profesores · 2 bloques departamentales · Período 2014–2025</div>
+      </div>
+      <div class="ctx-meta">
+        <span class="meta-chip">Scopus</span>
+        <span class="meta-chip">2014–2025</span>
+        <span class="meta-chip" id="meta-profs">19 profesores</span>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-hdr">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div class="card-title">Evolución de la Producción Científica</div>
+              <div class="card-sub">Publicaciones y citas acumuladas · 2014–2025</div>
+            </div>
+            <div style="display:flex;gap:5px">
+              <button class="chart-tab active" id="tab-pubs" onclick="setMode('pubs')">Publicaciones</button>
+              <button class="chart-tab" id="tab-citas" onclick="setMode('citas')">Citas</button>
+            </div>
+          </div>
+        </div>
+        <div class="card-body" style="padding-top:8px">
+          <svg id="area-svg" style="width:100%;height:195px;overflow:visible" viewBox="0 0 600 195" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="chart-legend" id="chart-leg">
+            <div class="leg-item"><div class="leg-dot" style="background:#4f46e5"></div>Total División</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--b1)"></div>Bloque 1</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--b2)"></div>Bloque 2</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-title">Distribución por Cuartil SJR</div>
+          <div class="card-sub">Calidad de las fuentes de publicación</div>
+        </div>
+        <div class="card-body">
+          <div class="donut-wrap">
+            <div class="donut-ring">
+              <div class="donut-face" id="donut-face"></div>
+              <div class="donut-hole">
+                <div class="donut-pct" id="donut-pct">67%</div>
+                <div class="donut-lbl-c">Q1 + Q2</div>
+              </div>
+            </div>
+            <div class="donut-legend" id="donut-leg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div class="bottom-row">
+      <div class="card">
+        <div class="card-hdr">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="card-title">Ranking de Profesores</div>
+              <div class="card-sub">Top 10 · ordenable</div>
+            </div>
+            <select class="sort-sel" id="rank-sort" onchange="renderRank()">
+              <option value="pubs">Publicaciones</option>
+              <option value="citas">Citas</option>
+              <option value="h">H-Index</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="rank-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Profesor</th>
+                <th>Pubs</th><th>Citas</th><th>H</th><th>Q1+Q2</th>
+              </tr>
+            </thead>
+            <tbody id="rank-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-title">Producción Anual</div>
+          <div class="card-sub">Artículos por año · 2025 = dato parcial</div>
+        </div>
+        <div class="card-body">
+          <div class="ann-chart" id="ann-chart"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:#94a3b8">
+            <span>2014</span><span>2019</span><span>2025</span>
+          </div>
+          <div style="margin-top:13px;padding-top:11px;border-top:1px solid #f1f5f9">
+            <div class="card-title" style="margin-bottom:8px;font-size:11.5px">Tipo Documental</div>
+            <div id="tipo-bars"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════
+const YEARS = [2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
+
+const BLOQUES = {
+  b1:{
+    nombre:"Matemáticas, Estadística y Ciencia de Datos",
+    color:"#2563eb",
+    subareas:{
+      algebra:"Álgebra y Análisis Matemático",
+      estadistica:"Estadística y Probabilidad",
+      cienciadatos:"Ciencia de Datos e IA"
+    }
+  },
+  b2:{
+    nombre:"Física, Biología y Química",
+    color:"#059669",
+    subareas:{
+      fisica:"Física Teórica y Aplicada",
+      biologia:"Biología y Ciencias de la Vida",
+      quimica:"Química y Materiales"
+    }
+  }
+};
+
+// anios[i] = publications in year YEARS[i]
+const PROFS = [
+  // B1 — Álgebra
+  {id:"carmen_lopez",   n:"Carmen López",     b:"b1",sa:"algebra",     pubs:52,citas:385,h:14,q1q2:78,anios:[0,3,4,6,7,6,5,7,6,5,3,0],tipo:{a:38,r:8,c:6}},
+  {id:"andres_restre",  n:"Andrés Restrepo",  b:"b1",sa:"algebra",     pubs:46,citas:298,h:12,q1q2:72,anios:[2,3,4,5,6,5,4,5,5,4,3,0],tipo:{a:32,r:6,c:8}},
+  {id:"maria_fernand",  n:"María Fernández",  b:"b1",sa:"algebra",     pubs:45,citas:312,h:13,q1q2:75,anios:[0,0,3,4,5,6,5,6,7,5,4,0],tipo:{a:35,r:7,c:3}},
+  {id:"jorge_pena",     n:"Jorge Peña",       b:"b1",sa:"algebra",     pubs:28,citas:165,h:9, q1q2:65,anios:[0,0,0,2,3,4,3,4,5,4,3,0],tipo:{a:22,r:2,c:4}},
+  // B1 — Estadística
+  {id:"laura_martinz",  n:"Laura Martínez",   b:"b1",sa:"estadistica", pubs:78,citas:612,h:18,q1q2:82,anios:[4,5,6,7,8,9,7,8,9,7,6,2],tipo:{a:58,r:12,c:8}},
+  {id:"carlos_vasquz",  n:"Carlos Vásquez",   b:"b1",sa:"estadistica", pubs:44,citas:245,h:11,q1q2:68,anios:[0,3,4,5,6,5,4,5,5,4,3,0],tipo:{a:32,r:5,c:7}},
+  {id:"ana_quintero",   n:"Ana Quintero",     b:"b1",sa:"estadistica", pubs:26,citas:142,h:8, q1q2:60,anios:[0,0,0,0,3,4,3,4,5,4,3,0],tipo:{a:20,r:3,c:3}},
+  // B1 — Ciencia de Datos
+  {id:"santiago_gomez", n:"Santiago Gómez",   b:"b1",sa:"cienciadatos",pubs:53,citas:445,h:15,q1q2:85,anios:[0,0,3,4,5,6,5,7,8,7,6,2],tipo:{a:42,r:6,c:5}},
+  {id:"daniela_torres", n:"Daniela Torres",   b:"b1",sa:"cienciadatos",pubs:32,citas:215,h:10,q1q2:79,anios:[0,0,0,2,3,4,3,5,6,5,4,0],tipo:{a:24,r:5,c:3}},
+  {id:"felipe_ramirez", n:"Felipe Ramírez",   b:"b1",sa:"cienciadatos",pubs:25,citas:142,h:8, q1q2:73,anios:[0,0,0,0,0,2,3,4,5,5,4,2],tipo:{a:18,r:3,c:4}},
+  // B2 — Física
+  {id:"roberto_mendoz", n:"Roberto Mendoza",  b:"b2",sa:"fisica",      pubs:79,citas:756,h:21,q1q2:65,anios:[5,6,7,8,9,8,6,7,8,7,6,2],tipo:{a:62,r:10,c:7}},
+  {id:"isabel_castil",  n:"Isabel Castillo",  b:"b2",sa:"fisica",      pubs:53,citas:389,h:15,q1q2:68,anios:[3,4,5,6,6,5,4,5,6,5,4,0],tipo:{a:42,r:8,c:3}},
+  {id:"pablo_herrera",  n:"Pablo Herrera",    b:"b2",sa:"fisica",      pubs:40,citas:285,h:12,q1q2:62,anios:[0,2,3,4,5,5,4,5,5,4,3,0],tipo:{a:30,r:5,c:5}},
+  // B2 — Biología
+  {id:"valentina_rios", n:"Valentina Ríos",   b:"b2",sa:"biologia",    pubs:57,citas:412,h:16,q1q2:60,anios:[2,3,4,5,6,6,5,6,7,6,5,2],tipo:{a:46,r:7,c:4}},
+  {id:"eduardo_sanch",  n:"Eduardo Sánchez",  b:"b2",sa:"biologia",    pubs:53,citas:342,h:13,q1q2:58,anios:[4,5,5,6,6,5,4,5,5,4,4,0],tipo:{a:42,r:6,c:5}},
+  {id:"natalia_agudle", n:"Natalia Agudelo",  b:"b2",sa:"biologia",    pubs:39,citas:256,h:11,q1q2:55,anios:[0,2,3,4,4,5,4,5,5,4,3,0],tipo:{a:30,r:5,c:4}},
+  // B2 — Química
+  {id:"cristina_moral", n:"Cristina Morales", b:"b2",sa:"quimica",     pubs:62,citas:489,h:17,q1q2:62,anios:[3,4,5,6,7,6,5,6,7,6,5,2],tipo:{a:50,r:8,c:4}},
+  {id:"alejandro_diaz", n:"Alejandro Díaz",   b:"b2",sa:"quimica",     pubs:45,citas:312,h:13,q1q2:58,anios:[2,3,4,5,5,5,4,5,5,4,3,0],tipo:{a:36,r:5,c:4}},
+  {id:"paola_suarez",   n:"Paola Suárez",     b:"b2",sa:"quimica",     pubs:35,citas:198,h:10,q1q2:55,anios:[0,0,2,3,4,5,4,5,5,4,3,0],tipo:{a:27,r:4,c:4}},
+];
+
+const CITAS_W = [.04,.05,.06,.08,.11,.13,.12,.12,.11,.10,.05,.03]; // citation distribution by year
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S = { bloque:null, subarea:null, prof:null, tipo:null, mode:'pubs' };
+
+// ═══════════════════════════════════════════════
+//  FILTER LOGIC
+// ═══════════════════════════════════════════════
+function filtered() {
+  let ps = PROFS;
+  if (S.bloque)  ps = ps.filter(p => p.b  === S.bloque);
+  if (S.subarea) ps = ps.filter(p => p.sa === S.subarea);
+  if (S.prof)    ps = ps.filter(p => p.id === S.prof);
+  // tipo filter: scale down pubs (doesn't affect citas/h/q, just visual)
+  return ps;
+}
+
+function selectBlock(b) {
+  if (S.bloque === b) { S.bloque = null; S.subarea = null; S.prof = null; }
+  else { S.bloque = b; S.subarea = null; S.prof = null; }
+  document.getElementById('tog-b1').className = 'block-toggle' + (S.bloque==='b1' ? ' act-b1':'');
+  document.getElementById('tog-b2').className = 'block-toggle' + (S.bloque==='b2' ? ' act-b2':'');
+  fillSubareaDropdown();
+  refresh();
+}
+
+function fillSubareaDropdown() {
+  const wrap = document.getElementById('wrap-subarea');
+  const sel  = document.getElementById('sel-subarea');
+  if (!S.bloque) { wrap.classList.remove('vis'); document.getElementById('wrap-prof').classList.remove('vis'); return; }
+  const sas = BLOQUES[S.bloque].subareas;
+  sel.innerHTML = '<option value="">Todas las sub-áreas</option>';
+  Object.entries(sas).forEach(([k,v]) => {
+    const o = document.createElement('option'); o.value=k; o.textContent=v; sel.appendChild(o);
+  });
+  sel.value = '';
+  wrap.classList.add('vis');
+  document.getElementById('wrap-prof').classList.remove('vis');
+}
+
+function onSubarea() {
+  S.subarea = document.getElementById('sel-subarea').value || null;
+  S.prof = null;
+  const wrap = document.getElementById('wrap-prof');
+  const sel  = document.getElementById('sel-prof');
+  if (!S.subarea) { wrap.classList.remove('vis'); refresh(); return; }
+  const ps = PROFS.filter(p => p.b===S.bloque && p.sa===S.subarea);
+  sel.innerHTML = '<option value="">Todos los profesores</option>';
+  ps.forEach(p => { const o=document.createElement('option'); o.value=p.id; o.textContent=p.n; sel.appendChild(o); });
+  sel.value='';
+  wrap.classList.add('vis');
+  refresh();
+}
+
+function onProf() { S.prof = document.getElementById('sel-prof').value || null; refresh(); }
+
+function resetAll() {
+  S.bloque=null; S.subarea=null; S.prof=null; S.tipo=null;
+  document.getElementById('tog-b1').className='block-toggle';
+  document.getElementById('tog-b2').className='block-toggle';
+  document.getElementById('wrap-subarea').classList.remove('vis');
+  document.getElementById('wrap-prof').classList.remove('vis');
+  document.getElementById('sel-tipo').value='';
+  refresh();
+}
+
+function setView(el,label) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('bc-cur').textContent = label;
+}
+
+function setMode(m) {
+  S.mode=m;
+  document.getElementById('tab-pubs').className='chart-tab'+(m==='pubs'?' active':'');
+  document.getElementById('tab-citas').className='chart-tab'+(m==='citas'?' active':'');
+  renderAreaChart();
+}
+
+// ═══════════════════════════════════════════════
+//  COMPUTATIONS
+// ═══════════════════════════════════════════════
+function kpis(ps) {
+  const tot = ps.reduce((s,p)=>s+p.pubs,0);
+  const cit = ps.reduce((s,p)=>s+p.citas,0);
+  const h   = ps.length ? Math.max(...ps.map(p=>p.h)) : 0;
+  const q   = ps.length ? Math.round(ps.reduce((s,p)=>s+p.q1q2*p.pubs,0)/(tot||1)) : 0;
+  return { tot, cit, h, q, n:ps.length, cpp: tot ? +(cit/tot).toFixed(1):0 };
+}
+
+function annualPubs(ps) {
+  return YEARS.map((_,i)=>ps.reduce((s,p)=>s+(p.anios[i]||0),0));
+}
+
+function annualCitas(ps) {
+  const tc = ps.reduce((s,p)=>s+p.citas,0);
+  return CITAS_W.map(w=>Math.round(tc*w));
+}
+
+function quartileDist(ps) {
+  const tot = ps.reduce((s,p)=>s+p.pubs,0);
+  if (!tot) return {Q1:0,Q2:0,Q3:0,Q4:0,Sin:0};
+  const avgQ = ps.reduce((s,p)=>s+p.q1q2*p.pubs,0)/tot;
+  const r = 100-avgQ;
+  return {
+    Q1: Math.round(tot*avgQ*.55/100),
+    Q2: Math.round(tot*avgQ*.45/100),
+    Q3: Math.round(tot*r*.50/100),
+    Q4: Math.round(tot*r*.28/100),
+    Sin:Math.round(tot*r*.22/100)
+  };
+}
+
+function tipoDist(ps) {
+  return { a:ps.reduce((s,p)=>s+p.tipo.a,0), r:ps.reduce((s,p)=>s+p.tipo.r,0), c:ps.reduce((s,p)=>s+p.tipo.c,0) };
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+function refresh() {
+  document.getElementById('loading-overlay').classList.add('vis');
+  setTimeout(()=>{
+    const ps = filtered();
+    const kp = kpis(ps);
+    updateContext(ps,kp);
+    renderKPIs(kp);
+    renderAreaChart();
+    renderDonut(ps);
+    renderRank();
+    renderAnnualBars(ps);
+    renderTipoBars(ps);
+    updateChips();
+    document.getElementById('loading-overlay').classList.remove('vis');
+  },40);
+}
+
+function updateContext(ps,kp) {
+  const banner = document.getElementById('ctx-banner');
+  banner.className = 'ctx-banner' + (S.bloque ? ' '+S.bloque : '');
+  const title  = document.getElementById('ctx-title');
+  const sub    = document.getElementById('ctx-sub');
+  const mp     = document.getElementById('meta-profs');
+  if (S.prof) {
+    const p=PROFS.find(x=>x.id===S.prof);
+    title.textContent = p.n+' — Perfil Individual';
+    sub.textContent = BLOQUES[p.b].nombre+' · '+BLOQUES[p.b].subareas[p.sa];
+  } else if (S.subarea && S.bloque) {
+    title.textContent = BLOQUES[S.bloque].subareas[S.subarea];
+    sub.textContent = ps.length+' profesores · '+BLOQUES[S.bloque].nombre;
+  } else if (S.bloque) {
+    title.textContent = BLOQUES[S.bloque].nombre;
+    sub.textContent = ps.length+' profesores · '+kp.tot+' publicaciones totales';
+  } else {
+    title.textContent = 'División de Ciencias Básicas — Visión General';
+    sub.textContent = '19 profesores · 2 bloques departamentales · Período 2014–2025';
+  }
+  mp.textContent = kp.n+' profesor'+(kp.n===1?'':'es');
+  document.getElementById('bc-cur').textContent = title.textContent.split('—')[0].trim();
+}
+
+function renderKPIs(kp) {
+  const defs = [
+    {l:'Publicaciones',v:kp.tot.toLocaleString('es-CO'),ico:'📄',c:'c-blue',d:'Scopus indexadas',dup:true},
+    {l:'Citas Totales',v:kp.cit.toLocaleString('es-CO'),ico:'💬',c:'c-violet',d:'Acumuladas',dup:true},
+    {l:'H-Index Máx.',v:kp.h,ico:'🎯',c:'c-green',d:'Mejor de la selección',dup:true},
+    {l:'% Q1 + Q2',v:kp.q+'%',ico:'⭐',c:'c-amber',d:'Alta calidad',dup:kp.q>=65},
+    {l:'Profesores Activos',v:kp.n,ico:'👥',c:'c-rose',d:'Con publicaciones',dup:true},
+    {l:'Citas / Pub.',v:kp.cpp,ico:'📊',c:'c-indigo',d:'Promedio',dup:true},
+  ];
+  document.getElementById('kpi-row').innerHTML = defs.map(d=>`
+    <div class="kpi-card ${d.c} ani">
+      <div class="kpi-ico">${d.ico}</div>
+      <div class="kpi-val">${d.v}</div>
+      <div class="kpi-lbl">${d.l}</div>
+      <div class="kpi-delta ${d.dup?'up':'neu'}">${d.dup?'↑ '+d.d:d.d}</div>
+    </div>`).join('');
+}
+
+function renderAreaChart() {
+  const svg  = document.getElementById('area-svg');
+  const ps   = filtered();
+  const data = S.mode==='pubs' ? annualPubs(ps) : annualCitas(ps);
+
+  const W=600,H=195,PL=40,PR=12,PT=16,PB=36;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const mx = Math.max(...data,1);
+  const xS = cW/(YEARS.length-1);
+  const tx = i=>PL+i*xS;
+  const ty = v=>PT+cH-(v/mx)*cH;
+
+  // grid
+  let g='';
+  [.25,.5,.75,1].forEach(f=>{
+    const y=PT+cH-f*cH, v=Math.round(mx*f);
+    g+=`<line x1="${PL}" y1="${y}" x2="${PL+cW}" y2="${y}" stroke="#f1f5f9" stroke-width="1"/>
+        <text x="${PL-5}" y="${y+4}" text-anchor="end" font-size="9" fill="#94a3b8">${v}</text>`;
+  });
+
+  // year labels (every 2)
+  let yl='';
+  YEARS.forEach((y,i)=>{ if(i%2===0) yl+=`<text x="${tx(i)}" y="${PT+cH+16}" text-anchor="middle" font-size="9" fill="#94a3b8">${y}</text>`; });
+
+  // main area + line
+  const pts = data.map((v,i)=>`${tx(i)},${ty(v)}`);
+  const line = 'M '+pts.join(' L ');
+  const area = line+` L ${tx(YEARS.length-1)},${PT+cH} L ${tx(0)},${PT+cH} Z`;
+  const col  = S.bloque==='b1'?'#2563eb':S.bloque==='b2'?'#059669':'#4f46e5';
+  const gid  = 'g'+col.replace('#','')+(S.mode==='citas'?'c':'p');
+
+  // b1/b2 split lines (global view only)
+  let extra='';
+  let legHTML = '<div class="leg-item"><div class="leg-dot" style="background:'+col+'"></div>'+
+    (S.bloque ? BLOQUES[S.bloque].nombre.split(' ').slice(0,2).join(' ') : 'Total División')+'</div>';
+  if (!S.bloque && S.mode==='pubs') {
+    const b1d=annualPubs(PROFS.filter(p=>p.b==='b1'));
+    const b2d=annualPubs(PROFS.filter(p=>p.b==='b2'));
+    const p1=b1d.map((v,i)=>`${tx(i)},${ty(v)}`).join(' ');
+    const p2=b2d.map((v,i)=>`${tx(i)},${ty(v)}`).join(' ');
+    extra=`<polyline points="${p1}" fill="none" stroke="#2563eb" stroke-width="1.6" stroke-dasharray="5,3" opacity=".65"/>
+           <polyline points="${p2}" fill="none" stroke="#059669" stroke-width="1.6" stroke-dasharray="5,3" opacity=".65"/>`;
+    legHTML += '<div class="leg-item"><div class="leg-dot" style="background:#2563eb"></div>Bloque 1</div>'+
+               '<div class="leg-item"><div class="leg-dot" style="background:#059669"></div>Bloque 2</div>';
+  }
+  document.getElementById('chart-leg').innerHTML = legHTML;
+
+  // dots
+  const dots = data.map((v,i)=>`
+    <circle cx="${tx(i)}" cy="${ty(v)}" r="4" fill="${col}" stroke="white" stroke-width="2"
+            class="cdot" data-y="${YEARS[i]}" data-v="${v}" data-m="${S.mode==='pubs'?'pub':'cita'}"
+            style="cursor:pointer"/>`).join('');
+
+  svg.innerHTML=`
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${col}" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="${col}" stop-opacity=".01"/>
+      </linearGradient>
+    </defs>
+    ${g}${yl}
+    <path d="${area}" fill="url(#${gid})" pointer-events="none"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>
+    ${extra}
+    ${dots}`;
+
+  // tooltips on dots
+  svg.querySelectorAll('.cdot').forEach(d=>{
+    d.addEventListener('mouseenter', e=>{
+      const tt=document.getElementById('tooltip');
+      tt.textContent=`${d.dataset.y}: ${d.dataset.v} ${d.dataset.m==='pub'?'publicaciones':'citas'}`;
+      tt.style.display='block';
+      tt.style.left=(e.clientX+13)+'px'; tt.style.top=(e.clientY-8)+'px';
+    });
+    d.addEventListener('mousemove', e=>{ const tt=document.getElementById('tooltip'); tt.style.left=(e.clientX+13)+'px'; tt.style.top=(e.clientY-8)+'px'; });
+    d.addEventListener('mouseleave',()=>{ document.getElementById('tooltip').style.display='none'; });
+  });
+}
+
+function renderDonut(ps) {
+  const dist = quartileDist(ps);
+  const tot  = Object.values(dist).reduce((a,b)=>a+b,0);
+  const q12  = tot ? Math.round((dist.Q1+dist.Q2)/tot*100) : 0;
+  document.getElementById('donut-pct').textContent = q12+'%';
+
+  const segs = [
+    {k:'Q1',col:'#16a34a'},{k:'Q2',col:'#2563eb'},
+    {k:'Q3',col:'#d97706'},{k:'Q4',col:'#dc2626'},{k:'Sin',col:'#94a3b8'}
+  ];
+  let acc=0;
+  const stops=segs.map(s=>{
+    const p=tot?dist[s.k]/tot*100:0;
+    const st=acc; acc+=p;
+    return `${s.col} ${st.toFixed(1)}% ${acc.toFixed(1)}%`;
+  }).join(',');
+  document.getElementById('donut-face').style.background = tot>0 ? `conic-gradient(${stops})` : '#e2e8f0';
+
+  document.getElementById('donut-leg').innerHTML = segs.map(s=>{
+    const cnt=dist[s.k], p=tot?Math.round(cnt/tot*100):0;
+    return `<div class="dl-item">
+      <div class="dl-dot" style="background:${s.col}"></div>
+      <span style="min-width:38px;font-size:10.5px">${s.k}</span>
+      <div class="dl-bar"><div class="dl-fill" style="width:${p}%;background:${s.col}"></div></div>
+      <div class="dl-cnt">${cnt}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRank() {
+  const ps   = filtered();
+  const sort = document.getElementById('rank-sort').value;
+  const top  = [...ps].sort((a,b)=>sort==='pubs'?b.pubs-a.pubs:sort==='citas'?b.citas-a.citas:b.h-a.h).slice(0,10);
+  const body = document.getElementById('rank-body');
+  if (!top.length) {
+    body.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:18px;font-size:12px">Sin datos para los filtros aplicados</td></tr>';
+    return;
+  }
+  const medals=['gold','silver','bronze'];
+  const emoj=['🥇','🥈','🥉'];
+  body.innerHTML = top.map((p,i)=>{
+    const rank=i+1;
+    const rnCls=rank<=3?medals[i]:'';
+    const rnTxt=rank<=3?emoj[i]:rank;
+    const bc=BLOQUES[p.b].color;
+    const qcls=p.q1q2>=80?'Q1':p.q1q2>=65?'Q2':p.q1q2>=50?'Q3':'Q4';
+    const sa=BLOQUES[p.b].subareas[p.sa].split(' ').slice(0,2).join(' ');
+    return `<tr>
+      <td><span class="rn ${rnCls}">${rnTxt}</span></td>
+      <td><div class="r-name-cell">
+        <div class="r-dept-dot" style="background:${bc}"></div>
+        <div><div class="r-name">${p.n}</div><div class="r-dept">${sa}</div></div>
+      </div></td>
+      <td style="text-align:right;font-weight:700">${p.pubs}</td>
+      <td style="text-align:right">${p.citas.toLocaleString('es-CO')}</td>
+      <td style="text-align:right">${p.h}</td>
+      <td style="text-align:right"><span class="qpill ${qcls}">${p.q1q2}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderAnnualBars(ps) {
+  const data=annualPubs(ps);
+  const mx=Math.max(...data,1);
+  const col=S.bloque==='b1'?'#2563eb':S.bloque==='b2'?'#059669':'#4f46e5';
+  document.getElementById('ann-chart').innerHTML = YEARS.map((y,i)=>{
+    const v=data[i], pct=(v/mx*100).toFixed(1);
+    const isPartial = y>=2024;
+    const barCol = isPartial ? col+'99' : col;
+    return `<div class="ann-col">
+      <div class="ann-bar-wrap">
+        <div class="ann-bar" style="height:${pct}%;background:${barCol}" title="${y}: ${v} publicaciones"></div>
+      </div>
+      <div class="ann-yr">${String(y).slice(2)}${y===2025?'*':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTipoBars(ps) {
+  const td=tipoDist(ps);
+  const mx=Math.max(td.a,td.r,td.c,1);
+  const col=S.bloque==='b1'?'#2563eb':S.bloque==='b2'?'#059669':'#4f46e5';
+  const items=[
+    {l:'Artículos',v:td.a,op:'ff'},{l:'Revisiones',v:td.r,op:'bb'},{l:'Conferencias',v:td.c,op:'77'}
+  ];
+  document.getElementById('tipo-bars').innerHTML = items.map(it=>`
+    <div class="tipo-row">
+      <div class="tipo-lbl">${it.l}</div>
+      <div class="tipo-track"><div class="tipo-fill" style="width:${(it.v/mx*100).toFixed(0)}%;background:${col+it.op}"></div></div>
+      <div class="tipo-val">${it.v}</div>
+    </div>`).join('');
+}
+
+function updateChips() {
+  const c=document.getElementById('chips');
+  let h='';
+  if (S.bloque) h+=`<div class="f-chip ${S.bloque}">🏷 ${BLOQUES[S.bloque].nombre.split(',')[0]}</div>`;
+  if (S.subarea&&S.bloque) h+=`<div class="f-chip neu">${BLOQUES[S.bloque].subareas[S.subarea]}</div>`;
+  if (S.prof) { const p=PROFS.find(x=>x.id===S.prof); h+=`<div class="f-chip neu">👤 ${p.n}</div>`; }
+  c.innerHTML=h;
+}
+
+function exportCSV() {
+  const ps=filtered();
+  const hdr=['Nombre','Bloque','Sub-área','Pubs','Citas','H-Index','%Q1+Q2'];
+  const rows=ps.map(p=>[
+    p.n, BLOQUES[p.b].nombre, BLOQUES[p.b].subareas[p.sa], p.pubs, p.citas, p.h, p.q1q2+'%'
+  ]);
+  const csv=[hdr,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blobUrl=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
+  const a=document.createElement('a');
+  a.href=blobUrl;
+  a.download='bibliometrico_dcb_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(blobUrl), 100);
+}
+
+// ─── INIT ───
+document.addEventListener('DOMContentLoaded', refresh);
+</script>
+</body>
+</html>

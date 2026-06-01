@@ -1,0 +1,904 @@
+/* ============================================================
+   SISTEMA DE DISEÑO — Monitor Bibliométrico Decanatura
+   Paleta institucional + Inter
+   ============================================================ */
+
+:root {
+    /* Paleta nueva */
+    --primary:     #1a3a5c;
+    --secondary:   #2563a8;
+    --accent:      #e8f0fb;
+    --success:     #1a7f5a;
+    --warning:     #b45309;
+    --danger:      #b91c1c;
+    --text-main:   #1e293b;
+    --text-muted:  #64748b;
+    --bg:          #f1f5f9;
+    --card-bg:     #ffffff;
+    --border:      #e2e8f0;
+
+    /* Aliases para compatibilidad con código heredado */
+    --brand-primary:   var(--primary);
+    --brand-secondary: var(--secondary);
+    --brand-accent:    var(--accent);
+    --brand-bg:        var(--bg);
+    --brand-surface:   var(--card-bg);
+    --text-dark:       var(--text-main);
+    --text-light:      #9ca3af;
+    --border-color:    var(--border);
+    --color-success:   var(--success);
+    --color-warning:   var(--warning);
+    --color-danger:    var(--danger);
+    --color-info:      var(--secondary);
+
+    /* Cuartiles */
+    --q1-bg: #d1fae5; --q1-text: #065f46;
+    --q2-bg: #dbeafe; --q2-text: #1e40af;
+    --q3-bg: #fef3c7; --q3-text: #92400e;
+    --q4-bg: #fee2e2; --q4-text: #991b1b;
+
+    /* Sombras */
+    --shadow-sm:  0 1px 4px rgba(0,0,0,0.08);
+    --shadow-md:  0 2px 8px rgba(0,0,0,0.10);
+    --shadow-lg:  0 4px 16px rgba(0,0,0,0.12);
+    --shadow-xl:  0 8px 24px rgba(0,0,0,0.14);
+
+    /* Radios */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    color: var(--text-main);
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.dashboard-shell {
+    min-height: 100vh;
+    background: var(--bg);
+}
+
+/* ============================================================
+   NAVBAR — fondo oscuro institucional
+   ============================================================ */
+
+.top-navbar {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    background: var(--primary) !important;
+    backdrop-filter: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
+    border: none !important;
+    padding: 0 24px;
+    height: 56px;
+}
+
+.top-navbar .container-fluid {
+    height: 56px;
+    display: flex;
+    align-items: center;
+}
+
+.navbar-brand-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.navbar-brand-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.15) !important;
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.navbar-brand-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: white !important;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.navbar-brand-subtitle {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.65) !important;
+    margin: 0;
+    letter-spacing: 0.02em;
+}
+
+.navbar-status-badge {
+    background: rgba(255,255,255,0.12) !important;
+    color: rgba(255,255,255,0.85) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ============================================================
+   HERO — banda superior compacta (máx 90px)
+   ============================================================ */
+
+.hero-wrapper {
+    padding: 0;
+}
+
+.hero-section {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    border-radius: 0;
+    padding: 14px 28px;
+    box-shadow: none;
+    min-height: auto;
+    max-height: 90px;
+    display: flex;
+    align-items: center;
+    color: white;
+}
+
+.hero-inner {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.hero-eyebrow {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.65;
+    margin-bottom: 2px;
+}
+
+.hero-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.hero-subtitle {
+    font-size: 12px;
+    opacity: 0.75;
+    margin: 2px 0 0 0;
+    font-weight: 400;
+}
+
+.hero-badges {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.hero-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.9);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   PANEL DE FILTROS
+   ============================================================ */
+
+.filter-card {
+    margin: 12px 16px;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    background: white !important;
+}
+
+.filter-card .card-header {
+    background: var(--accent) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 12px 20px !important;
+    font-weight: 600;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+.filter-group {
+    background: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    height: 100%;
+}
+
+.filter-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
+}
+
+.filter-dropdown .Select-control,
+.filter-dropdown .select__control {
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--border) !important;
+    min-height: 36px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    background: white !important;
+}
+
+.filter-dropdown .Select-control:focus-within,
+.filter-dropdown .select__control--is-focused {
+    border-color: var(--secondary) !important;
+    box-shadow: 0 0 0 3px rgba(37,99,168,0.15) !important;
+}
+
+.filter-slider { padding-top: 8px; }
+
+/* ============================================================
+   KPI CARDS
+   ============================================================ */
+
+.kpi-wrapper {
+    padding: 0 16px;
+    margin-bottom: 12px;
+}
+
+.kpi-card {
+    background: white !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    overflow: hidden;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+}
+
+.kpi-card-body {
+    padding: 18px 20px !important;
+}
+
+.kpi-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.kpi-text { flex: 1; }
+
+.kpi-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.kpi-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.1;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+}
+
+.kpi-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    font-weight: 400;
+}
+
+.kpi-icon-wrap {
+    width: 44px; height: 44px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.5rem;
+}
+
+/* ============================================================
+   TABS — underline con acento
+   ============================================================ */
+
+.tabs-modern {
+    padding: 0 16px;
+    margin-bottom: 8px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+}
+
+.tabs-modern .nav-tabs {
+    border-bottom: none !important;
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0;
+}
+
+.tabs-modern .nav-tabs::-webkit-scrollbar { display: none; }
+
+.tabs-modern .nav-link {
+    border: none !important;
+    border-bottom: 3px solid transparent !important;
+    border-radius: 0 !important;
+    padding: 12px 16px;
+    color: var(--text-muted) !important;
+    font-weight: 400;
+    font-size: 13px;
+    background: transparent !important;
+    transition: color 0.2s ease, border-color 0.2s ease;
+    white-space: nowrap;
+    margin-bottom: -1px;
+}
+
+.tabs-modern .nav-link:hover {
+    color: var(--primary) !important;
+    background: transparent !important;
+}
+
+.tabs-modern .nav-link.active {
+    color: var(--primary) !important;
+    font-weight: 600;
+    background: transparent !important;
+    border-bottom-color: var(--secondary) !important;
+}
+
+.tab-content { padding-top: 10px; }
+
+/* ============================================================
+   CARDS GENERALES
+   ============================================================ */
+
+.pretty-card,
+.section-card {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    background: white !important;
+    overflow: hidden;
+}
+
+.pretty-card .card-header,
+.section-card .card-header {
+    background: #f8fafc !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 14px 18px !important;
+}
+
+.card-title-block { display: flex; flex-direction: column; gap: 2px; }
+
+.card-title-main {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.card-title-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    font-weight: 400;
+}
+
+.plot-card .card-body  { padding: 12px 14px 8px 14px !important; }
+.table-card .card-body { padding: 4px 0 0 0 !important; }
+
+/* ============================================================
+   SECTION LAYOUT
+   ============================================================ */
+
+.page-section { padding: 0 16px; }
+.section-stack { display: flex; flex-direction: column; gap: 16px; }
+
+.section-header-inline {
+    padding: 0 16px;
+    margin-bottom: 10px;
+}
+
+.section-header-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.section-header-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.pretty-section-title  { font-size: 14px; font-weight: 600; color: var(--text-main); margin: 0; }
+.pretty-section-subtitle { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+/* ============================================================
+   GRÁFICOS
+   ============================================================ */
+
+.plot-shell {
+    background: white;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.plot-caption {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* ============================================================
+   TABLAS HTML (dbc.Table)
+   ============================================================ */
+
+.table {
+    font-size: 13px;
+    margin-bottom: 0 !important;
+    color: var(--text-main);
+}
+
+.table thead th {
+    background: var(--primary) !important;
+    color: white !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: none !important;
+    padding: 10px 14px !important;
+    white-space: nowrap;
+}
+
+.table tbody tr {
+    background: white;
+    transition: background 0.1s ease;
+}
+
+.table tbody tr:nth-child(even) { background: var(--accent); }
+.table tbody tr:hover { background: #dbeafe !important; }
+
+.table td {
+    vertical-align: middle;
+    padding: 9px 14px !important;
+    border-color: var(--border) !important;
+    border-left: none !important;
+    border-right: none !important;
+}
+
+/* Pills de cuartil */
+.pill-q1 { background: var(--q1-bg); color: var(--q1-text); padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+.pill-q2 { background: var(--q2-bg); color: var(--q2-text); padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+.pill-q3 { background: var(--q3-bg); color: var(--q3-text); padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+.pill-q4 { background: var(--q4-bg); color: var(--q4-text); padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+
+/* Pills de estado matching */
+.pill-ok       { background: #d1fae5; color: #065f46; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+.pill-revisar  { background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+.pill-critico  { background: #fee2e2; color: #991b1b; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; }
+
+/* ============================================================
+   DASH DATATABLE
+   ============================================================ */
+
+.dash-table-container .dash-spreadsheet-container {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.dash-table-container .dash-spreadsheet-inner th {
+    background: var(--primary) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 10px 12px !important;
+    border-bottom: none !important;
+    border-right: 1px solid rgba(255,255,255,0.15) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.dash-table-container .dash-spreadsheet-inner td {
+    font-size: 13px !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 9px 12px !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-left: none !important;
+    border-right: none !important;
+    color: var(--text-main) !important;
+}
+
+.dash-table-container .dash-spreadsheet-inner tr:nth-child(even) td {
+    background: var(--accent) !important;
+}
+
+.dash-table-container .dash-spreadsheet-inner tr:hover td {
+    background: #dbeafe !important;
+}
+
+.dash-table-container .dash-filter input {
+    background: #f8fafc !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Export button in DataTable */
+.export {
+    background: white !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-muted) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 6px 14px !important;
+    border-radius: var(--radius-sm) !important;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif !important;
+    transition: all 0.15s ease;
+    margin: 8px 12px;
+}
+
+.export:hover {
+    background: var(--accent) !important;
+    border-color: var(--secondary) !important;
+    color: var(--secondary) !important;
+}
+
+/* ============================================================
+   PERFIL PROFESOR
+   ============================================================ */
+
+.professor-hero {
+    margin: 0 16px 14px 16px;
+    border-radius: var(--radius-xl);
+    background: white;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+}
+
+.professor-hero-body { padding: 22px 24px 18px 24px; }
+
+.professor-name {
+    font-family: 'DM Serif Display', 'Inter', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--primary);
+    margin-bottom: 6px;
+}
+
+.professor-meta {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.professor-chip {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--primary);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 6px;
+    margin-top: 4px;
+}
+
+/* ============================================================
+   BENCHMARKING — Medallas y ranking
+   ============================================================ */
+
+.rank-medal { font-size: 1.2rem; }
+.rank-number {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 24px;
+    display: inline-block;
+    text-align: center;
+}
+
+.trend-up   { color: var(--success); font-weight: 600; }
+.trend-down { color: var(--danger);  font-weight: 600; }
+.trend-flat { color: var(--text-muted); font-weight: 600; }
+
+.indice-bar {
+    display: inline-block;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--secondary);
+    vertical-align: middle;
+}
+
+/* ============================================================
+   SEMÁFORO DE CALIDAD DE DATOS
+   ============================================================ */
+
+.semaforo-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.semaforo-light {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    opacity: 0.22;
+    transition: opacity 0.3s;
+}
+
+.semaforo-light.active { opacity: 1; box-shadow: 0 0 20px currentColor; }
+.semaforo-light.verde  { background: #10b981; color: #10b981; }
+.semaforo-light.ambar  { background: #f59e0b; color: #f59e0b; }
+.semaforo-light.rojo   { background: #ef4444; color: #ef4444; }
+
+.semaforo-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-top: 6px;
+    text-align: center;
+}
+
+/* ============================================================
+   SKELETON (indicadores de carga)
+   ============================================================ */
+
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-chart { height: 380px; }
+.skeleton-kpi   { height: 100px; }
+.skeleton-table { height: 240px; }
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty-state-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 8px;
+}
+
+.empty-state-text {
+    font-size: 13px;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* ============================================================
+   MINI KPIS (estadísticas de colaboración)
+   ============================================================ */
+
+.mini-kpi-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+.mini-kpi {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    min-width: 130px;
+}
+
+.mini-kpi-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+}
+
+.mini-kpi-value {
+    font-size: 16px;
+    color: var(--primary);
+    font-weight: 600;
+    margin: 0;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.footer-modern {
+    margin: 20px 16px 12px 16px;
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   BOTONES
+   ============================================================ */
+
+.btn-export {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-export:hover {
+    background: var(--accent);
+    border-color: var(--secondary);
+    color: var(--secondary);
+}
+
+.btn-apply {
+    background: var(--secondary);
+    border: 1px solid var(--secondary);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 18px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-apply:hover { background: var(--primary); border-color: var(--primary); }
+
+/* ============================================================
+   TABLE TOOLBAR
+   ============================================================ */
+
+.table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.table-toolbar-title  { font-size: 14px; font-weight: 600; color: var(--text-main); margin: 0; }
+.table-toolbar-subtitle { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+/* Pill de conteo en toolbar */
+.table-pill {
+    background: var(--accent);
+    color: var(--secondary);
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Fila resaltada (artículos de alto impacto) */
+.row-highlight-q1 { background: #d1fae5 !important; }
+.row-highlight-impact { background: #fef9e7 !important; }
+
+/* ============================================================
+   RED DE COAUTORÍA
+   ============================================================ */
+
+.network-card .card-body { padding: 8px !important; }
+
+/* ============================================================
+   RESPONSIVIDAD
+   ============================================================ */
+
+@media (max-width: 1280px) {
+    .kpi-value { font-size: 26px; }
+    .hero-title { font-size: 17px; }
+    .hero-section { padding: 12px 20px; }
+    .hero-badges { display: none; }
+}
+
+@media (max-width: 992px) {
+    .hero-title { font-size: 15px; }
+    .hero-section { padding: 10px 16px; max-height: 70px; }
+    .tabs-modern .nav-link { font-size: 12px; padding: 9px 12px; }
+}
+
+@media (max-width: 768px) {
+    .kpi-value { font-size: 22px; }
+    .hero-section { padding: 10px 14px; }
+    .kpi-wrapper > .col-xl-2 { flex: 0 0 50%; max-width: 50%; }
+}
+
+/* ============================================================
+   RANKING — hipervínculo de nombre de profesor
+   ============================================================ */
+
+.prof-ranking-link {
+    color: var(--secondary);
+    cursor: pointer;
+    font-weight: 500;
+    background: none;
+    border: none;
+    padding: 0;
+    text-decoration: none;
+    display: inline;
+    transition: color 0.15s ease;
+}
+
+.prof-ranking-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}

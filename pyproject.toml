@@ -1,0 +1,8 @@
+[project]
+name = "scopus-decanatura"
+version = "0.1.0"
+description = "Sistema de monitoreo bibliométrico institucional basado en datos de Scopus"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
