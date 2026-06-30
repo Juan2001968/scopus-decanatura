@@ -785,6 +785,46 @@ def _compute_global_kpis(
     return kpis
 
 
+_UNIVERSIDAD_KPIS_CACHE: Optional[dict] = None
+
+
+def _compute_universidad_kpis() -> dict:
+    """KPIs institucionales de TODA la Universidad del Norte.
+
+    Usa la tabla ``publicacion`` completa (sin ``solo_division`` y sin filtros
+    de area/profesor/periodo/tipo/cuartil): la descarga por ``AF-ID``
+    institucional cubre todas las publicaciones de Uninorte, no solo las de la
+    Division.  Por diseno, estos totales son fijos y NO reaccionan a los
+    filtros del tablero.
+
+    El H-index de Universidad es *publication-based*: se calcula a partir de
+    los ``cited_by_count`` de todas las publicaciones (metodologia distinta al
+    H-index de la Division, que promedia el de los profesores).
+
+    El resultado se memoiza tras la primera consulta exitosa (los datos son
+    constantes durante la vida del proceso); un resultado vacio/transitorio
+    -por ejemplo si la BD aun no esta lista- no se cachea.
+    """
+    global _UNIVERSIDAD_KPIS_CACHE
+    if _UNIVERSIDAD_KPIS_CACHE is not None:
+        return _UNIVERSIDAD_KPIS_CACHE
+
+    df = queries.get_publicaciones(anio_min=_ANIO_MIN_RESET, anio_max=_ANIO_MAX_RESET)
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return metrics.generar_kpis_resumen(pd.DataFrame(), h_index=None)
+
+    kpis = metrics.generar_kpis_resumen(df, h_index=None)
+    if "cuartil_sjr" in df.columns:
+        total = len(df)
+        q1q2  = df["cuartil_sjr"].isin(["Q1", "Q2"]).sum()
+        kpis["pct_q1q2"] = q1q2 / total if total > 0 else 0.0
+    else:
+        kpis["pct_q1q2"] = None
+
+    _UNIVERSIDAD_KPIS_CACHE = kpis
+    return kpis
+
+
 def _compute_profesor_kpis(
     profesor_id: int,
     anios: object,
@@ -824,24 +864,36 @@ def _make_custom_kpi_block(
     ])
 
 
-def _make_division_summary_blocks(kpis_division: dict) -> html.Div:
-    """Resumen general consolidado: un único bloque de la División.
+def _make_division_summary_blocks(
+    kpis_division: dict,
+    kpis_universidad: dict,
+) -> html.Div:
+    """Resumen general consolidado: dos bloques apilados.
 
-    NOTA(datos): el conjunto de datos cubre EXCLUSIVAMENTE la División de
-    Ciencias Básicas (sus tres departamentos y sus profesores). No existe una
-    métrica universidad-wide distinta de la División, por lo que se eliminó el
-    bloque duplicado "Indicadores de la Universidad del Norte" que mostraba
-    exactamente las mismas cifras. Si en el futuro se incorpora una fuente que
-    cubra a toda la Universidad del Norte, calcular sus KPIs por separado y
-    añadir aquí un bloque "Universidad" con esos valores.
+    1) "Universidad del Norte": totales institucionales completos calculados
+       sobre TODA la tabla ``publicacion`` (descarga por ``AF-ID``).  No son
+       reactivos a los filtros del tablero (ver ``_compute_universidad_kpis``).
+    2) "División de Ciencias Básicas": los mismos cuatro KPIs restringidos a la
+       División (vía ``solo_division``) y SÍ reactivos a los filtros activos.
+
+    Ambos bloques son visualmente idénticos pero se alimentan de dicts
+    distintos: ``kpis_universidad`` (constante) y ``kpis_division`` (filtrado).
     """
+    upper_uni = _make_custom_kpi_block(
+        "Indicadores de la Universidad del Norte",
+        "Totales institucionales de producción, impacto y calidad de fuente "
+        "(no afectados por los filtros).",
+        kpis_universidad,
+        cards=["publicaciones_uni", "citas_uni", "pct_q1q2", "h_index_uni"],
+    )
     upper_div = _make_custom_kpi_block(
         "Indicadores de la División de Ciencias Básicas",
-        "Vista consolidada de producción, impacto y calidad de fuente de la División.",
+        "Vista consolidada de producción, impacto y calidad de fuente de la "
+        "División (reactiva a los filtros).",
         kpis_division,
         cards=["publicaciones_div", "citas_div", "pct_q1q2", "h_index"],
     )
-    return html.Div([upper_div])
+    return html.Div([upper_uni, upper_div])
 
 
 # ---------------------------------------------------------------------------
@@ -969,7 +1021,7 @@ def update_dashboard_content(
             kpis_division["h_index_label"] = f"H-index{suffix}" if suffix else "H-index División"
             kpis_dept = _compute_global_kpis(anios_value, tipos, cuartiles, departamento_id=departamento_id)
             kpis_dept["h_index_label"] = f"H-index Depto.{suffix}"
-            upper_block = _make_division_summary_blocks(kpis_division)
+            upper_block = _make_division_summary_blocks(kpis_division, _compute_universidad_kpis())
             context_block = _make_kpi_block(
                 f"Indicadores · {dept_name}",
                 "Indicadores del área de investigación para el período y filtros activos.",
@@ -980,7 +1032,7 @@ def update_dashboard_content(
             # Caso 1: sin filtro
             kpis_division = _compute_global_kpis(anios_value, tipos, cuartiles)
             kpis_division["h_index_label"] = f"H-index{suffix}" if suffix else "H-index División"
-            upper_block = _make_division_summary_blocks(kpis_division)
+            upper_block = _make_division_summary_blocks(kpis_division, _compute_universidad_kpis())
             context_block = html.Div(style={"display": "none"})
 
         c_resumen = c_profesor = c_impacto = c_fuentes = no_update
@@ -1038,6 +1090,7 @@ def update_dashboard_content(
 
         empty_upper = _make_division_summary_blocks(
             metrics.generar_kpis_resumen(pd.DataFrame(), h_index=None),
+            _compute_universidad_kpis(),
         )
         return (
             empty_upper, html.Div(style={"display": "none"}),
@@ -1112,6 +1165,42 @@ def _toggle_panels(active_view: str) -> list[dict]:
 )
 def _update_breadcrumb(active_view: str) -> str:
     return _BREADCRUMB_LABELS.get(active_view, "Visión General")
+
+
+# ---------------------------------------------------------------------------
+# Sidebar móvil (drawer): abrir con la hamburguesa, cerrar con el overlay o al
+# navegar a otra vista. En escritorio el CSS ignora estas clases.
+# ---------------------------------------------------------------------------
+
+
+@app.callback(
+    Output("store-sidebar-open", "data"),
+    Input("sidebar-toggle",  "n_clicks"),
+    Input("sidebar-overlay", "n_clicks"),
+    *[Input(f"nav-{t}", "n_clicks") for t in _NAV_TABS],
+    State("store-sidebar-open", "data"),
+    prevent_initial_call=True,
+)
+def _toggle_sidebar(*args):
+    is_open = bool(args[-1])
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    # La hamburguesa alterna; cualquier otro disparador (overlay o navegación)
+    # cierra el drawer.
+    return (not is_open) if trigger == "sidebar-toggle" else False
+
+
+@app.callback(
+    Output("sidebar",         "className"),
+    Output("sidebar-overlay", "className"),
+    Input("store-sidebar-open", "data"),
+)
+def _apply_sidebar_state(is_open: bool) -> tuple[str, str]:
+    if is_open:
+        return "sidebar-open", "sidebar-overlay visible"
+    return "", "sidebar-overlay"
 
 
 @app.callback(

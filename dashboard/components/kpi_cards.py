@@ -157,10 +157,11 @@ def _card_citas_div(kpis: dict) -> dbc.Card:
 
 
 def _card_h_index_uni(kpis: dict) -> dbc.Card:
-    # TODO(datos): hoy NO existe un H-index calculado a nivel UNIVERSIDAD distinto
-    # del de la División. Se reutiliza el mismo "h_index" del DataFrame agregado
-    # de la División (o 0 si no hay datos). Cuando exista una fuente
-    # universidad-wide, calcular su H-index por separado y pasarlo aquí.
+    # H-index institucional *publication-based*: se calcula sobre los
+    # ``cited_by_count`` de TODAS las publicaciones de Uninorte (tabla
+    # ``publicacion`` completa). El dict proviene de
+    # ``_compute_universidad_kpis``; su clave ``h_index`` ya es el valor de la
+    # Universidad, distinto del H-index de la División.
     return create_kpi_card(
         title="H-index Universidad",
         value=_format_number(kpis.get("h_index")),

@@ -154,6 +154,13 @@ def _main() -> html.Main:
         children=[
             html.Div(
                 [
+                    html.Button(
+                        "☰",
+                        id="sidebar-toggle",
+                        className="hamburger-btn",
+                        n_clicks=0,
+                        **{"aria-label": "Abrir menú"},
+                    ),
                     html.Div(
                         [
                             html.Span("División de Ciencias Básicas", style={"color": "#64748b"}),
@@ -184,7 +191,11 @@ app.layout = html.Div(
     className="dashboard-shell",
     children=[
         dcc.Store(id="store-active-view", data="tab-resumen"),
+        dcc.Store(id="store-sidebar-open", data=False),
         _sidebar(),
+        # Capa oscura detrás del drawer en móvil; al hacer clic, cierra la
+        # sidebar. En escritorio está oculta vía CSS.
+        html.Div(id="sidebar-overlay", className="sidebar-overlay", n_clicks=0),
         _main(),
     ],
 )

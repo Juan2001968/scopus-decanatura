@@ -503,12 +503,67 @@ body {
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── HAMBURGUESA + OVERLAY (ocultos en escritorio) ── */
+.hamburger-btn {
+    display: none;
+    margin-right: 12px;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #1e293b;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+.hamburger-btn:hover { background: #f1f5f9; }
+
+.sidebar-overlay { display: none; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 1280px) {
     .kpi-value { font-size: 20px !important; }
 }
 
-@media (max-width: 900px) {
+/* ── MÓVIL: sidebar como drawer off-canvas ── */
+@media (max-width: 768px) {
     .dashboard-shell { grid-template-columns: 1fr; }
-    #sidebar { display: none; }
+
+    /* La sidebar deja de ocupar columna y se vuelve un panel deslizante. */
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 264px;
+        max-width: 82vw;
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform var(--tr);
+        z-index: 200;
+    }
+    #sidebar.sidebar-open { transform: translateX(0); }
+
+    /* Capa oscura: solo visible cuando el drawer está abierto. */
+    .sidebar-overlay.visible {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .45);
+        z-index: 150;
+    }
+
+    /* Botón hamburguesa visible en la barra superior, junto al breadcrumb. */
+    .hamburger-btn { display: inline-flex; }
+    .top-bar { justify-content: flex-start; }
+
+    /* Tarjetas KPI: apiladas / grid de 2 (lo refuerza el grid de dbc). */
+    .main-content { padding: 14px 14px 24px; }
+    .kpi-card-body { padding: 13px 12px !important; }
+
+    /* Tablas (incl. Ranking de Profesores): scroll horizontal sin desbordar. */
+    .table-card,
+    .table-responsive { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
 }
