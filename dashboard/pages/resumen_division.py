@@ -120,7 +120,7 @@ def _card_ranking_profesores(df: pd.DataFrame) -> dbc.Card:
     header = html.Thead(html.Tr([
         html.Th("#"),
         html.Th("Profesor"),
-        html.Th("Departamento"),
+        html.Th("Área de investigación"),
         html.Th("Publicaciones", style={"textAlign": "right"}),
         html.Th("Citas", style={"textAlign": "right"}),
         html.Th("H-index", style={"textAlign": "right"}),
@@ -240,7 +240,7 @@ def _card_top10_profesores(df: pd.DataFrame) -> dbc.Card:
     return dbc.Card([
         _pretty_header(
             "Top 10 Profesores por Publicaciones",
-            "Colores por departamento · período filtrado",
+            "Colores por área de investigación · período filtrado",
         ),
         dbc.CardBody(html.Div(
             dcc.Graph(figure=fig, config={"displayModeBar": False}),
@@ -318,7 +318,7 @@ def _card_evolucion_toggle(df: pd.DataFrame) -> dbc.Card:
 
     return dbc.Card([
         _pretty_header(
-            "Evolución de publicaciones por departamento",
+            "Evolución de publicaciones por área de investigación",
             "Barras anuales apiladas · botón para ver acumulado",
         ),
         dbc.CardBody(html.Div(
@@ -409,10 +409,10 @@ def _card_tipos(df: pd.DataFrame) -> dbc.Card:
 
 def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
     if df.empty:
-        return _card_vacia("Comparativa departamentos", "Sin información comparativa.")
+        return _card_vacia("Comparativa áreas de investigación", "Sin información comparativa.")
 
     col_map = {
-        "nombre_departamento":   "Departamento",
+        "nombre_departamento":   "Área de investigación",
         "profesores":            "Profesores activos",
         "publicaciones_total":   "Publicaciones",
         "publicaciones_3_anios": "2014–2025",
@@ -460,7 +460,7 @@ def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
     return dbc.Card([
         html.Div([
             html.Div([
-                html.H5("Producción por Departamento", className="table-toolbar-title"),
+                html.H5("Producción por Área de investigación", className="table-toolbar-title"),
                 html.P("Indicadores consolidados por unidad académica con totales.", className="table-toolbar-subtitle"),
             ]),
         ], className="table-toolbar"),

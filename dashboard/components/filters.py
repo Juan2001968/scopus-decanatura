@@ -24,10 +24,10 @@ def create_filters() -> dbc.Card:
     col_depto = dbc.Col(
         html.Div(
             [
-                html.Label("Departamento", className="filter-label", htmlFor="filter-departamento"),
+                html.Label("Área de investigación", className="filter-label", htmlFor="filter-departamento"),
                 dcc.Dropdown(
                     id="filter-departamento",
-                    placeholder="Todos los departamentos",
+                    placeholder="Todas las áreas de investigación",
                     clearable=True,
                     searchable=True,
                     className="filter-dropdown",
@@ -129,7 +129,7 @@ def create_filters() -> dbc.Card:
                 html.Div([
                     html.H5("Panel de filtros", className="pretty-section-title"),
                     html.Div(
-                        "Refina la vista por departamento, profesor, años, tipo y cuartil.",
+                        "Refina la vista por área de investigación, profesor, años, tipo y cuartil.",
                         className="pretty-section-subtitle",
                     ),
                 ])

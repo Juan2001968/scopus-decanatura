@@ -17,7 +17,12 @@ _NAV_ITEMS = [
     ("tab-fuentes",      "⭐", "Calidad de Fuente"),
     ("tab-colaboracion", "🌐", "Colaboración"),
     ("tab-benchmarking", "📊", "Rankings"),
-    ("tab-matching",     "🔍", "Calidad de Datos"),
+    # Oculto temporalmente: la vista "Calidad de Datos" (matching) no se muestra
+    # en la navegación por ahora. El código de la página y sus callbacks se
+    # conservan intactos; para reactivarla, descomentar esta línea y la entrada
+    # correspondiente en _NAV_TABS / _BREADCRUMB_LABELS / el callback principal
+    # de dashboard/callbacks/filter_callbacks.py.
+    # ("tab-matching",     "🔍", "Calidad de Datos"),
     ("tab-explorador",   "🗂",  "Explorador"),
 ]
 
@@ -47,10 +52,10 @@ def _sidebar() -> html.Aside:
         [
             html.Div("Filtros", className="f-section"),
 
-            html.Label("Departamento", className="f-label"),
+            html.Label("Área de investigación", className="f-label"),
             dcc.Dropdown(
                 id="filter-departamento",
-                placeholder="Todos los departamentos",
+                placeholder="Todas las áreas de investigación",
                 clearable=True,
                 searchable=True,
             ),

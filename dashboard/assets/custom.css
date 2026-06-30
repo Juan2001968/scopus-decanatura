@@ -838,6 +838,20 @@ h1, h2, h3, h4, h5, h6 {
 .table-toolbar-title  { font-size: 14px; font-weight: 600; color: var(--text-main); margin: 0; }
 .table-toolbar-subtitle { font-size: 12px; color: var(--text-muted); margin: 0; }
 
+/* Selector de métrica de orden del ranking */
+.ranking-sort-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ranking-sort-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 0;
+    white-space: nowrap;
+}
+
 /* Pill de conteo en toolbar */
 .table-pill {
     background: var(--accent);

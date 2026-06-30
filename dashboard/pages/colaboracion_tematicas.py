@@ -75,10 +75,10 @@ def layout_colaboracion(data: dict) -> html.Div:
         ], className="section-header-inline"),
 
         html.Div([
-            # Red + stats
+            # Red de co-autoría (ancho completo).
+            # Oculta temporalmente: "Estadísticas de co-autoría" (_card_stats_colaboracion).
             dbc.Row([
-                dbc.Col(_card_red_coautoria(coautoria, profesores), md=8),
-                dbc.Col(_card_stats_colaboracion(colab), md=4),
+                dbc.Col(_card_red_coautoria(coautoria, profesores), md=12),
             ], className="g-3 mb-3"),
 
             # Keywords: tabla + barra horizontal
@@ -87,14 +87,17 @@ def layout_colaboracion(data: dict) -> html.Div:
                 dbc.Col(_card_top_keywords_tabla(top_kw), md=5),
             ], className="g-3 mb-3"),
 
-            # Colaboración tipo + histograma
-            dbc.Row([
-                dbc.Col(_card_colab_tipo(hist_autores), md=6),
-                dbc.Col(_card_histograma_autores(hist_autores), md=6),
-            ], className="g-3 mb-3"),
+            # Fila oculta temporalmente (las funciones se conservan abajo):
+            #   - "Tipo de colaboración"        -> _card_colab_tipo
+            #   - "Distribución de coautores"   -> _card_histograma_autores
+            # dbc.Row([
+            #     dbc.Col(_card_colab_tipo(hist_autores), md=6),
+            #     dbc.Col(_card_histograma_autores(hist_autores), md=6),
+            # ], className="g-3 mb-3"),
 
-            # Publicaciones colaborativas interinstitucionales
-            _card_publicaciones_interinstitucionales(interinst),
+            # Oculta temporalmente:
+            #   "Publicaciones Colaborativas Interinstitucionales"
+            #   -> _card_publicaciones_interinstitucionales(interinst)
 
             # Open Access + idiomas
             dbc.Row([

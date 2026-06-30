@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Union
+from typing import Callable, Union
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -52,9 +52,174 @@ def create_kpi_card(
     )
 
 
+# ---------------------------------------------------------------------------
+# Tarjetas individuales reutilizables
+#
+# Cada constructor recibe el dict de KPIs y devuelve una ``dbc.Card`` con el
+# mismo estilo visual. Esto permite componer filas con cualquier subconjunto y
+# orden de tarjetas mediante ``create_kpi_row_custom``.
+# ---------------------------------------------------------------------------
+
+
+def _card_publicaciones(
+    kpis: dict,
+    title: str = "Publicaciones Uninorte",
+    subtitle: str = "Producción del período",
+) -> dbc.Card:
+    return create_kpi_card(
+        title=title,
+        value=_format_number(kpis.get("publicaciones_3_anios")),
+        subtitle=subtitle,
+        color="primary",
+        icon_class="bi-journals",
+    )
+
+
+def _card_citas(
+    kpis: dict,
+    title: str = "Citas totales",
+    subtitle: str = "Impacto acumulado",
+) -> dbc.Card:
+    citas = kpis.get("citas", {})
+    return create_kpi_card(
+        title=title,
+        value=_format_number(citas.get("total")),
+        subtitle=subtitle,
+        color="secondary",
+        icon_class="bi-chat-quote",
+    )
+
+
+def _card_autocitas(kpis: dict) -> dbc.Card:
+    citas_autocitas = kpis.get("autocitas_intragrupo")
+    val = _format_number(citas_autocitas) if citas_autocitas is not None else "—"
+    sub = "Citas dentro del grupo" if citas_autocitas is not None else "Dato no disponible"
+    return create_kpi_card(
+        title="Autocitas",
+        value=val,
+        subtitle=sub,
+        color="info",
+        icon_class="bi-filter-circle",
+    )
+
+
+def _card_h_index(kpis: dict) -> dbc.Card:
+    return create_kpi_card(
+        title=kpis.get("h_index_label", "H-index División"),
+        value=_format_number(kpis.get("h_index")),
+        subtitle="Período filtrado",
+        color="success",
+        icon_class="bi-trophy",
+    )
+
+
+def _card_pct_q1q2(kpis: dict) -> dbc.Card:
+    pct_q1q2 = kpis.get("pct_q1q2")
+    val = f"{pct_q1q2:.1%}" if pct_q1q2 is not None else "—"
+    sub = "Publicaciones en Q1 o Q2" if pct_q1q2 is not None else "Sin datos de cuartil"
+    return create_kpi_card(
+        title="% en Q1 o Q2",
+        value=val,
+        subtitle=sub,
+        color="warning",
+        icon_class="bi-award",
+    )
+
+
+def _card_profesores(kpis: dict) -> dbc.Card:
+    profesores_activos = kpis.get("profesores_activos")
+    val = _format_number(profesores_activos) if profesores_activos is not None else "—"
+    return create_kpi_card(
+        title="Profesores activos",
+        value=val,
+        subtitle="Con ≥1 publicación",
+        color="danger",
+        icon_class="bi-people",
+    )
+
+
+# Variantes con subtítulo de ámbito (Universidad vs División), reutilizadas por
+# los dos bloques del resumen general.
+def _card_publicaciones_uni(kpis: dict) -> dbc.Card:
+    return _card_publicaciones(kpis, title="Publicaciones", subtitle="Universidad del Norte")
+
+
+def _card_citas_uni(kpis: dict) -> dbc.Card:
+    return _card_citas(kpis, title="Citas totales", subtitle="Universidad del Norte")
+
+
+def _card_publicaciones_div(kpis: dict) -> dbc.Card:
+    return _card_publicaciones(kpis, title="Publicaciones", subtitle="División de Ciencias Básicas")
+
+
+def _card_citas_div(kpis: dict) -> dbc.Card:
+    return _card_citas(kpis, title="Citas totales", subtitle="División de Ciencias Básicas")
+
+
+def _card_h_index_uni(kpis: dict) -> dbc.Card:
+    # TODO(datos): hoy NO existe un H-index calculado a nivel UNIVERSIDAD distinto
+    # del de la División. Se reutiliza el mismo "h_index" del DataFrame agregado
+    # de la División (o 0 si no hay datos). Cuando exista una fuente
+    # universidad-wide, calcular su H-index por separado y pasarlo aquí.
+    return create_kpi_card(
+        title="H-index Universidad",
+        value=_format_number(kpis.get("h_index")),
+        subtitle="Universidad del Norte",
+        color="success",
+        icon_class="bi-trophy",
+    )
+
+
+# Registro de tarjetas disponibles por clave, para componer filas a la carta.
+_CARD_BUILDERS: dict[str, Callable[[dict], dbc.Card]] = {
+    # Tarjetas "clásicas" (orden por defecto de create_kpi_row)
+    "publicaciones": _card_publicaciones,
+    "citas":         _card_citas,
+    "autocitas":     _card_autocitas,
+    "h_index":       _card_h_index,
+    "pct_q1q2":      _card_pct_q1q2,
+    "profesores":    _card_profesores,
+    # Variantes con ámbito explícito
+    "publicaciones_uni": _card_publicaciones_uni,
+    "citas_uni":         _card_citas_uni,
+    "h_index_uni":       _card_h_index_uni,
+    "publicaciones_div": _card_publicaciones_div,
+    "citas_div":         _card_citas_div,
+}
+
+# Orden por defecto de la fila completa de 6 tarjetas.
+_DEFAULT_CARDS = [
+    "publicaciones", "citas", "autocitas", "h_index", "pct_q1q2", "profesores",
+]
+
+
+def create_kpi_row_custom(kpis: dict, cards: list[str]) -> dbc.Row:
+    """Construye una fila de KPIs con un subconjunto y orden de tarjetas.
+
+    ``cards`` es una lista de claves de :data:`_CARD_BUILDERS`. El ancho de las
+    columnas se reparte automáticamente para llenar la fila (12 columnas
+    Bootstrap), manteniendo el mismo estilo visual de las tarjetas.
+    """
+    n = len(cards) or 1
+    # Reparte las 12 columnas; nunca menos de 2 (≥6 tarjetas) ni más de 12.
+    xl = min(12, max(2, 12 // n))
+    lg = 4 if n > 3 else min(12, max(4, 12 // n))
+
+    cols = []
+    for key in cards:
+        builder = _CARD_BUILDERS.get(key)
+        if builder is None:
+            continue
+        cols.append(
+            dbc.Col(builder(kpis), xl=xl, lg=lg, md=6, sm=6, xs=12)
+        )
+
+    return dbc.Row(cols, className="g-3 kpi-wrapper")
+
+
 def create_kpi_row(kpis: dict) -> dbc.Row:
     """
-    KPIs para Decanatura:
+    KPIs para Decanatura (fila completa de 6 tarjetas):
     1. Publicaciones 2014–2025
     2. Total citas
     3. Citas excluyendo autocitas
@@ -62,81 +227,8 @@ def create_kpi_row(kpis: dict) -> dbc.Row:
     5. % publicaciones Q1 o Q2
     6. Profesores activos
     """
-    citas    = kpis.get("citas", {})
-    metricas = kpis.get("metricas_fuente", {})
-
-    pct_q1q2 = kpis.get("pct_q1q2")
-    q1q2_val = f"{pct_q1q2:.1%}" if pct_q1q2 is not None else "—"
-    q1q2_sub = "Publicaciones en Q1 o Q2" if pct_q1q2 is not None else "Sin datos de cuartil"
-
-    citas_autocitas = kpis.get("autocitas_intragrupo")
-    citas_auto_val  = _format_number(citas_autocitas) if citas_autocitas is not None else "—"
-    citas_auto_sub  = "Citas dentro del grupo" if citas_autocitas is not None else "Dato no disponible"
-
-    profesores_activos = kpis.get("profesores_activos")
-    prof_val = _format_number(profesores_activos) if profesores_activos is not None else "—"
-
-    cards = [
-        dbc.Col(
-            create_kpi_card(
-                title="Publicaciones Uninorte",
-                value=_format_number(kpis.get("publicaciones_3_anios")),
-                subtitle="Producción del período",
-                color="primary",
-                icon_class="bi-journals",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
-        dbc.Col(
-            create_kpi_card(
-                title="Citas totales",
-                value=_format_number(citas.get("total")),
-                subtitle="Impacto acumulado",
-                color="secondary",
-                icon_class="bi-chat-quote",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
-        dbc.Col(
-            create_kpi_card(
-                title="Autocitas",
-                value=citas_auto_val,
-                subtitle=citas_auto_sub,
-                color="info",
-                icon_class="bi-filter-circle",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
-        dbc.Col(
-            create_kpi_card(
-                title=kpis.get("h_index_label", "H-index División"),
-                value=_format_number(kpis.get("h_index")),
-                subtitle="Período filtrado",
-                color="success",
-                icon_class="bi-trophy",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
-        dbc.Col(
-            create_kpi_card(
-                title="% en Q1 o Q2",
-                value=q1q2_val,
-                subtitle=q1q2_sub,
-                color="warning",
-                icon_class="bi-award",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
-        dbc.Col(
-            create_kpi_card(
-                title="Profesores activos",
-                value=prof_val,
-                subtitle="Con ≥1 publicación",
-                color="danger",
-                icon_class="bi-people",
-            ),
-            xl=2, lg=4, md=4, sm=6, xs=12,
-        ),
+    cols = [
+        dbc.Col(_CARD_BUILDERS[key](kpis), xl=2, lg=4, md=4, sm=6, xs=12)
+        for key in _DEFAULT_CARDS
     ]
-
-    return dbc.Row(cards, className="g-3 kpi-wrapper")
+    return dbc.Row(cols, className="g-3 kpi-wrapper")

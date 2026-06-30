@@ -469,6 +469,11 @@ def load_fuente_metricas(
                 fuente_datos="scimago_scopus",
             )
             session.add(new_metric)
+            # Registrar en el indice en memoria para que filas posteriores
+            # con la misma id_fuente (p.ej. fuentes deduplicadas que comparten
+            # ISSN) actualicen esta metrica en vez de insertar un duplicado
+            # que violaria uq_fuente_metrica_anio.
+            existing_metrics[(id_fuente, anio)] = new_metric
             inserted += 1
 
     session.flush()

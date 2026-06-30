@@ -149,7 +149,7 @@ def _card_tabla_matching(df: pd.DataFrame) -> dbc.Card:
 
     col_labels = {
         "nombre_normalizado": "Profesor",
-        "departamento":       "Dept.",
+        "departamento":       "Área de investigación",
         "pubs_perfil":        "Pubs Scopus",
         "pubs_extraidas":     "Pubs extraídas",
         "diferencia":         "Diferencia",

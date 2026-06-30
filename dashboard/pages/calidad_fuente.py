@@ -163,7 +163,7 @@ def _card_bubble_revistas(df: pd.DataFrame) -> dbc.Card:
 
 def _card_cuartiles_stacked(df: pd.DataFrame) -> dbc.Card:
     if df.empty:
-        return _card_vacia("Cuartiles por departamento", "Sin datos.")
+        return _card_vacia("Cuartiles por área de investigación", "Sin datos.")
 
     fig = px.bar(
         df, x="departamento", y="count", color="cuartil",
@@ -178,7 +178,7 @@ def _card_cuartiles_stacked(df: pd.DataFrame) -> dbc.Card:
     fig.update_xaxes(tickangle=-10)
 
     return dbc.Card([
-        _pretty_header("Cuartiles por departamento",
+        _pretty_header("Cuartiles por área de investigación",
                        "Distribución Q1–Q4 de las publicaciones"),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
@@ -190,7 +190,7 @@ def _card_cuartiles_stacked(df: pd.DataFrame) -> dbc.Card:
 
 def _card_sjr_departamento(df: pd.DataFrame) -> dbc.Card:
     if df.empty:
-        return _card_vacia("SJR por departamento", "Sin datos de SJR.")
+        return _card_vacia("SJR por área de investigación", "Sin datos de SJR.")
 
     fig = go.Figure(go.Bar(
         x=df["sjr_promedio"],
@@ -206,7 +206,7 @@ def _card_sjr_departamento(df: pd.DataFrame) -> dbc.Card:
     fig.update_layout(showlegend=False)
 
     return dbc.Card([
-        _pretty_header("SJR promedio por departamento", "Indicador de impacto de las fuentes"),
+        _pretty_header("SJR promedio por área de investigación", "Indicador de impacto de las fuentes"),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
 

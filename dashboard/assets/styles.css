@@ -148,9 +148,10 @@ body {
 .f-label {
     display: block;
     font-size: 10.5px;
-    font-weight: 500;
-    color: rgba(255,255,255,.5) !important;
-    margin-bottom: 5px;
+    font-weight: 600;
+    color: rgba(255,255,255,.78) !important;
+    letter-spacing: .01em;
+    margin-bottom: 6px;
     margin-top: 12px;
 }
 
@@ -158,66 +159,119 @@ body {
 #sidebar .Select-control,
 #sidebar .Select--single > .Select-control,
 #sidebar .is-focused:not(.is-open) > .Select-control {
-    background: rgba(255,255,255,.06) !important;
-    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(255,255,255,.10) !important;
+    border: 1px solid rgba(255,255,255,.22) !important;
     border-radius: 8px !important;
-    min-height: 34px !important;
+    min-height: 36px !important;
     box-shadow: none !important;
+    transition: border-color var(--tr), background var(--tr), box-shadow var(--tr);
 }
 
+#sidebar .Select-control:hover {
+    background: rgba(255,255,255,.14) !important;
+    border-color: rgba(255,255,255,.34) !important;
+}
+
+/* Estado activo/foco: borde y halo de acento para que se note al filtrar */
+#sidebar .is-focused .Select-control,
+#sidebar .is-open .Select-control {
+    background: rgba(255,255,255,.16) !important;
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 0 3px rgba(129,140,248,.25) !important;
+}
+
+/* Valor seleccionado: casi blanco para máxima legibilidad */
 #sidebar .Select-value-label,
+#sidebar .Select--single > .Select-control .Select-value .Select-value-label {
+    color: #f8fafc !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+/* Placeholder: gris claro legible pero diferenciado del valor real */
 #sidebar .Select-placeholder {
-    color: rgba(255,255,255,.7) !important;
-    font-size: 11.5px !important;
+    color: rgba(255,255,255,.6) !important;
+    font-size: 12px !important;
 }
 
 #sidebar .Select-arrow-zone .Select-arrow {
-    border-top-color: rgba(255,255,255,.4) !important;
+    border-top-color: rgba(255,255,255,.7) !important;
 }
 
+/* Texto que se escribe al buscar/filtrar — blanco pleno + caret visible */
+#sidebar .Select-input > input,
 #sidebar .Select-input input {
-    color: rgba(255,255,255,.8) !important;
+    color: #ffffff !important;
+    caret-color: #818cf8 !important;
 }
 
 #sidebar .Select-menu-outer {
-    background: #1e1b4b !important;
-    border: 1px solid rgba(255,255,255,.15) !important;
-    border-radius: 8px !important;
-    margin-top: 4px !important;
+    background: #272264 !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 10px !important;
+    margin-top: 6px !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,.45) !important;
+    overflow: hidden !important;
     z-index: 9999 !important;
 }
 
-#sidebar .Select-option {
+/* Opciones del menú — cubre Select-option Y VirtualizedSelectOption
+   (dcc.Dropdown renderiza con react-virtualized-select). Sin esto, el
+   texto queda con el color oscuro por defecto e invisible sobre el menú. */
+#sidebar .Select-option,
+#sidebar .VirtualizedSelectOption {
     background: transparent !important;
-    color: rgba(255,255,255,.75) !important;
-    font-size: 11.5px !important;
+    color: #e8ebf5 !important;
+    font-size: 12px !important;
     padding: 8px 12px !important;
 }
 
 #sidebar .Select-option:hover,
-#sidebar .Select-option.is-focused {
-    background: rgba(255,255,255,.1) !important;
-    color: #fff !important;
+#sidebar .Select-option.is-focused,
+#sidebar .VirtualizedSelectOption:hover,
+#sidebar .VirtualizedSelectFocusedOption {
+    background: rgba(129,140,248,.28) !important;
+    color: #ffffff !important;
 }
 
-#sidebar .Select-option.is-selected {
-    background: rgba(99,102,241,.3) !important;
-    color: #fff !important;
+#sidebar .Select-option.is-selected,
+#sidebar .VirtualizedSelectSelectedOption {
+    background: rgba(99,102,241,.42) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+#sidebar .Select-noresults {
+    color: rgba(255,255,255,.55) !important;
+    font-size: 11.5px !important;
+    padding: 8px 12px !important;
 }
 
 #sidebar .Select-clear-zone,
-#sidebar .Select-clear { color: rgba(255,255,255,.4) !important; }
+#sidebar .Select-clear { color: rgba(255,255,255,.65) !important; }
+#sidebar .Select-clear-zone:hover,
+#sidebar .Select-clear:hover { color: #fff !important; }
 
+/* Chips de selección múltiple (tipo documental, cuartil) */
 #sidebar .Select-multi-value-wrapper .Select-value {
-    background: rgba(99,102,241,.3) !important;
-    border: 1px solid rgba(99,102,241,.5) !important;
-    border-radius: 4px !important;
-    color: rgba(255,255,255,.9) !important;
+    background: rgba(129,140,248,.32) !important;
+    border: 1px solid rgba(129,140,248,.6) !important;
+    border-radius: 5px !important;
+    color: #ffffff !important;
+}
+
+#sidebar .Select--multi .Select-value .Select-value-label {
+    color: #ffffff !important;
 }
 
 #sidebar .Select-value-icon {
-    color: rgba(255,255,255,.6) !important;
-    border-right-color: rgba(99,102,241,.5) !important;
+    color: rgba(255,255,255,.8) !important;
+    border-right-color: rgba(129,140,248,.6) !important;
+}
+
+#sidebar .Select-value-icon:hover {
+    background: rgba(239,68,68,.5) !important;
+    color: #fff !important;
 }
 
 /* RangeSlider inside sidebar */

@@ -5,6 +5,7 @@ Ranking de profesores con índice compuesto + radar chart por departamento.
 """
 from __future__ import annotations
 
+import json
 from typing import Dict, List
 
 import dash_bootstrap_components as dbc
@@ -46,7 +47,7 @@ def layout_benchmarking(data: dict) -> html.Div:
         html.Div([
             html.H4("Rankings y Benchmarking", className="section-header-title"),
             html.P(
-                "Índice de impacto compuesto por profesor y comparativa multidimensional por departamento.",
+                "Índice de impacto compuesto por profesor y comparativa multidimensional por área de investigación.",
                 className="section-header-subtitle",
             ),
         ], className="section-header-inline"),
@@ -61,27 +62,44 @@ def layout_benchmarking(data: dict) -> html.Div:
 
 
 # ---------------------------------------------------------------------------
-# Tabla de ranking con índice compuesto
+# Tabla de ranking con métrica de orden seleccionable
 # ---------------------------------------------------------------------------
 
-def _card_ranking(df: pd.DataFrame) -> dbc.Card:
-    if df.empty:
-        return _card_vacia("Ranking de profesores", "Sin datos para construir el ranking.")
+# Métricas por las que se puede ordenar el ranking. La clave (value) mapea a la
+# columna real del DataFrame; la etiqueta (label) es lo que ve el usuario.
+_SORT_OPTIONS = [
+    {"label": "h-index", "value": "h_index"},
+    {"label": "Citas",   "value": "citas_totales"},
+    {"label": "% Q1+Q2", "value": "pct_q1q2"},
+]
+_SORT_LABELS = {opt["value"]: opt["label"] for opt in _SORT_OPTIONS}
+_DEFAULT_SORT = "h_index"
 
-    # Normalizar (0-1) para el índice compuesto
-    def _norm(col: pd.Series) -> pd.Series:
-        mx = col.max()
-        if mx == 0 or pd.isna(mx):
-            return pd.Series(0.0, index=col.index)
-        return col.fillna(0) / mx
 
-    h_norm   = _norm(pd.to_numeric(df.get("h_index", 0), errors="coerce"))
-    c_norm   = _norm(pd.to_numeric(df.get("citas_totales", 0), errors="coerce"))
-    q_norm   = _norm(pd.to_numeric(df.get("pct_q1q2", 0), errors="coerce"))
+def ranking_caption(sort_by: str) -> str:
+    """Subtítulo de la tarjeta del ranking según la métrica de orden."""
+    label = _SORT_LABELS.get(sort_by, _SORT_LABELS[_DEFAULT_SORT])
+    return f"Ordenado por: {label}"
+
+
+def build_ranking_table_body(df: pd.DataFrame, sort_by: str = _DEFAULT_SORT):
+    """Construye el cuerpo de la tabla de ranking ordenado por la métrica dada.
+
+    ``sort_by`` debe ser una de las columnas reales: ``h_index``,
+    ``citas_totales`` o ``pct_q1q2``. Recalcula posiciones (#, medallas) tras
+    ordenar de mayor a menor. Tolera DataFrames vacíos (datos sin BD).
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return html.Div([
+            html.Div("Sin datos disponibles", className="empty-state-title"),
+            html.P("Sin datos para construir el ranking.", className="empty-state-text"),
+        ], className="empty-state")
+
+    sort_col = sort_by if sort_by in _SORT_LABELS else _DEFAULT_SORT
 
     df = df.copy()
-    df["indice"] = (0.4 * h_norm + 0.3 * c_norm + 0.3 * q_norm).round(3)
-    df = df.sort_values("indice", ascending=False).reset_index(drop=True)
+    df[sort_col] = pd.to_numeric(df.get(sort_col, 0), errors="coerce")
+    df = df.sort_values(sort_col, ascending=False, na_position="last").reset_index(drop=True)
     df["rank"] = range(1, len(df) + 1)
 
     # Tendencia: comparar pubs últimas ventana vs anterior
@@ -108,7 +126,6 @@ def _card_ranking(df: pd.DataFrame) -> dbc.Card:
         html.Th("h-index"),
         html.Th("Citas"),
         html.Th("% Q1+Q2"),
-        html.Th("Índice"),
         html.Th(""),
     ]))
 
@@ -122,11 +139,7 @@ def _card_ranking(df: pd.DataFrame) -> dbc.Card:
         h_val = row.get("h_index")
         c_val = row.get("citas_totales")
         q_val = row.get("pct_q1q2")
-        ind   = row.get("indice", 0)
         tend  = row.get("tendencia", "→")
-
-        # Barra de índice (anchura proporcional)
-        bar_w = max(4, int(ind * 60))
 
         cells = [
             html.Td(html.Span(f"{medal} {rank}" if medal else str(rank),
@@ -137,28 +150,51 @@ def _card_ranking(df: pd.DataFrame) -> dbc.Card:
             html.Td(f"{int(h_val):,}" if pd.notna(h_val) else "—"),
             html.Td(f"{int(c_val):,}" if pd.notna(c_val) else "—"),
             html.Td(f"{q_val:.0%}" if pd.notna(q_val) else "—"),
-            html.Td(html.Div([
-                html.Span(f"{ind:.3f}", style={"fontWeight": "600", "marginRight": "6px"}),
-                html.Span(className="indice-bar", style={"width": f"{bar_w}px"}),
-            ], style={"display": "flex", "alignItems": "center"})),
             html.Td(html.Span(tend, className=_tend_class(tend))),
         ]
         rows.append(html.Tr(cells))
 
+    return dbc.Table(
+        [header, html.Tbody(rows)],
+        bordered=False, hover=True, striped=False,
+        responsive=True, size="sm", className="mb-0 align-middle",
+    )
+
+
+def _card_ranking(df: pd.DataFrame) -> dbc.Card:
+    df = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+    # El DataFrame se guarda en un dcc.Store; el reordenamiento lo hace un
+    # callback dedicado (ver filter_callbacks._update_ranking_table) para evitar
+    # dependencias circulares con el callback que renderiza esta tarjeta.
+    records = json.loads(df.to_json(orient="records")) if not df.empty else []
+
     return dbc.Card([
+        dcc.Store(id="store-ranking-data", data=records),
         html.Div([
             html.Div([
                 html.H5("Ranking de profesores", className="table-toolbar-title"),
                 html.P(
-                    "Índice compuesto = 0.4×h-index + 0.3×citas + 0.3×%Q1Q2 (normalizados).",
+                    ranking_caption(_DEFAULT_SORT),
+                    id="ranking-sort-caption",
                     className="table-toolbar-subtitle",
                 ),
             ]),
+            html.Div([
+                html.Label("Ordenar por", className="ranking-sort-label"),
+                dcc.Dropdown(
+                    id="ranking-sort-metric",
+                    options=_SORT_OPTIONS,
+                    value=_DEFAULT_SORT,
+                    clearable=False,
+                    searchable=False,
+                    style={"minWidth": "150px"},
+                ),
+            ], className="ranking-sort-control"),
         ], className="table-toolbar"),
-        dbc.Table(
-            [header, html.Tbody(rows)],
-            bordered=False, hover=True, striped=False,
-            responsive=True, size="sm", className="mb-0 align-middle",
+        html.Div(
+            build_ranking_table_body(df, _DEFAULT_SORT),
+            id="ranking-table-body",
         ),
     ], className="pretty-card table-card")
 
@@ -171,8 +207,8 @@ def _card_radar(radar: dict) -> dbc.Card:
     """
     radar = {
         "departamentos": [...],
-        "dimensiones": ["Volumen","Impacto","Calidad","h-index","Colaboración","Tendencia"],
-        "valores": [[d1_dim1,...,d1_dim6], [d2_dim1,...], ...]
+        "dimensiones": ["Volumen","Impacto","Calidad","h-index","Tendencia"],
+        "valores": [[d1_dim1,...,d1_dim5], [d2_dim1,...], ...]
     }
     """
     deptos = radar.get("departamentos", [])
@@ -190,9 +226,6 @@ def _card_radar(radar: dict) -> dbc.Card:
         r_closed = list(row_vals) + [row_vals[0]]
         t_closed = list(dims) + [dims[0]]
 
-        # Formato corto del nombre de departamento
-        short = dept.split()[-2] if len(dept.split()) >= 2 else dept[:10]
-
         fig.add_trace(go.Scatterpolar(
             r=r_closed,
             theta=t_closed,
@@ -200,7 +233,7 @@ def _card_radar(radar: dict) -> dbc.Card:
             fillcolor=color,
             line=dict(color=color, width=2.5),
             opacity=0.25,
-            name=short,
+            name=dept,
             hovertemplate="<b>%{theta}</b>: %{r:.2f}<extra></extra>",
         ))
         # Línea sólida sin fill encima
@@ -241,8 +274,8 @@ def _card_radar(radar: dict) -> dbc.Card:
 
     return dbc.Card([
         _pretty_header(
-            "Perfil multidimensional por departamento",
-            "6 dimensiones normalizadas (0–1): Volumen · Impacto · Calidad · h-index · Colaboración · Tendencia",
+            "Perfil multidimensional por área de investigación",
+            "5 dimensiones normalizadas (0–1): Volumen · Impacto · Calidad · h-index · Tendencia",
         ),
         dbc.CardBody(html.Div(
             dcc.Graph(figure=fig, config={"displayModeBar": False}),

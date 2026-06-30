@@ -80,17 +80,20 @@ def layout_impacto(data: dict) -> html.Div:
                 dbc.Col(_card_citas_dept(comparativa), md=5),
             ], className="g-3 mb-3"),
 
-            # Citas vs Autocitas + Evolución de citas
+            # Evolución de citas (ancho completo).
+            # Ocultas temporalmente del layout (las funciones se conservan abajo):
+            #   - "Citas vs Autocitas"     -> _card_citas_vs_autocitas
+            #   - "Citas ajustadas"        -> _card_citas_ajustadas
+            #   - "Porcentaje de autocitas"-> _card_autocitas_pct
             dbc.Row([
-                dbc.Col(_card_citas_vs_autocitas(citas_auto_anio), md=6),
-                dbc.Col(_card_evolucion_citas(evolucion), md=6),
+                dbc.Col(_card_evolucion_citas(evolucion), md=12),
             ], className="g-3 mb-3"),
 
-            # Citas ajustadas + % autocitas por año
-            dbc.Row([
-                dbc.Col(_card_citas_ajustadas(citas_anio), md=6),
-                dbc.Col(_card_autocitas_pct(citas_auto_anio), md=6),
-            ], className="g-3 mb-3"),
+            # Fila oculta (Citas ajustadas + % autocitas por año):
+            # dbc.Row([
+            #     dbc.Col(_card_citas_ajustadas(citas_anio), md=6),
+            #     dbc.Col(_card_autocitas_pct(citas_auto_anio), md=6),
+            # ], className="g-3 mb-3"),
 
             # Tabla: profesores por citas promedio
             _card_mayor_impacto_cita_promedio(comparativa),
@@ -209,7 +212,7 @@ def _card_mayor_impacto_cita_promedio(df: pd.DataFrame) -> dbc.Card:
 
     col_map = {
         "nombre_normalizado":  "Profesor",
-        "departamento":        "Departamento",
+        "departamento":        "Área de investigación",
         "publicaciones_total": "Publicaciones",
         "citas_totales":       "Citas totales",
         "citas_por_pub":       "Citas / Pub.",
@@ -284,7 +287,7 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
         color_discrete_map=COLORES_DEPT,
         text="nombre_normalizado",
         labels={"publicaciones_total": "Publicaciones", "citas_totales": "Citas",
-                "departamento": "Departamento", "h_index": "h-index"},
+                "departamento": "Área de investigación", "h_index": "h-index"},
         size_max=28,
         custom_data=["nombre_normalizado", "publicaciones_total", "citas_totales", "h_index"],
     )
@@ -322,7 +325,7 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
 
 def _card_citas_dept(df: pd.DataFrame) -> dbc.Card:
     if df.empty or "citas_totales" not in df.columns:
-        return _card_vacia("Citas por departamento", "Sin datos comparativos.")
+        return _card_vacia("Citas por área de investigación", "Sin datos comparativos.")
 
     plot_df = (
         df.groupby("departamento", as_index=False)["citas_totales"]
@@ -342,7 +345,7 @@ def _card_citas_dept(df: pd.DataFrame) -> dbc.Card:
     fig.update_layout(showlegend=False)
 
     return dbc.Card([
-        _pretty_header("Citas acumuladas por departamento", "Impacto total comparado"),
+        _pretty_header("Citas acumuladas por área de investigación", "Impacto total comparado"),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
 
@@ -358,7 +361,7 @@ def _card_evolucion_citas(df: pd.DataFrame) -> dbc.Card:
     fig = px.line(
         df, x="anio", y="citas_totales", color="departamento",
         markers=True, color_discrete_map=COLORES_DEPT,
-        labels={"anio": "Año", "citas_totales": "Citas", "departamento": "Departamento"},
+        labels={"anio": "Año", "citas_totales": "Citas", "departamento": "Área de investigación"},
     )
     fig.update_traces(line=dict(width=3), marker=dict(size=8))
     _apply_layout(fig, height=340)

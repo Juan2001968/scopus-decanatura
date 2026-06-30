@@ -15,9 +15,13 @@ import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, html, no_update
 
 from dashboard.app import app
-from dashboard.components.kpi_cards import create_kpi_row
+from dashboard.components.kpi_cards import create_kpi_row, create_kpi_row_custom
 from dashboard.pages.analisis_impacto import layout_impacto
-from dashboard.pages.benchmarking import layout_benchmarking
+from dashboard.pages.benchmarking import (
+    build_ranking_table_body,
+    layout_benchmarking,
+    ranking_caption,
+)
 from dashboard.pages.calidad_fuente import layout_fuentes
 from dashboard.pages.calidad_matching import layout_matching
 from dashboard.pages.colaboracion_tematicas import layout_colaboracion
@@ -143,13 +147,13 @@ def _get_profesores_df(departamento_id: Optional[int] = None) -> pd.DataFrame:
 
 def _get_departamento_nombre(departamento_id: Optional[int]) -> str:
     if departamento_id is None:
-        return "Departamento"
+        return "Área de investigación"
     df = _get_departamentos_df()
     if df.empty:
-        return "Departamento"
+        return "Área de investigación"
     row = df[df["id_departamento"] == departamento_id]
     if row.empty:
-        return "Departamento"
+        return "Área de investigación"
     return str(row.iloc[0]["nombre"])
 
 
@@ -243,7 +247,7 @@ def _get_department_contexts(
 
     for _, row in deptos.iterrows():
         did   = _safe_int(row.get("id_departamento"))
-        dname = str(row.get("nombre", "Departamento"))
+        dname = str(row.get("nombre", "Área de investigación"))
         df    = _fetch_publicaciones(did, None, anios, tipos, cuartiles)
         contexts.append({"id_departamento": did, "departamento": dname, "df": df})
 
@@ -667,7 +671,7 @@ def _build_benchmarking_data(
     anio_prev_min = anio_rec_min - 3
     anio_prev_max = anio_rec_min - 1
 
-    dimensiones = ["Volumen", "Impacto", "Calidad", "h-index", "Colaboración", "Tendencia"]
+    dimensiones = ["Volumen", "Impacto", "Calidad", "h-index", "Tendencia"]
     dept_names, raw_vals = [], []
 
     for ctx in contexts:
@@ -686,9 +690,9 @@ def _build_benchmarking_data(
                                  errors="coerce").dropna()
         h_mean   = float(h_vals.mean()) if not h_vals.empty else 0.0
 
-        hist  = _build_histograma_autores(df)
-        colab = float(hist["n_autores"].mean()) if not hist.empty else 0.0
-
+        # La dimensión "Colaboración" se eliminó del radar (salía en blanco y
+        # deformaba el polígono). Se conserva el resto: Volumen, Impacto,
+        # Calidad, h-index y Tendencia.
         if not df.empty and "anio_publicacion" in df.columns:
             rec  = len(df[df["anio_publicacion"] >= anio_rec_min])
             prev = len(df[df["anio_publicacion"].between(anio_prev_min, anio_prev_max)])
@@ -696,7 +700,7 @@ def _build_benchmarking_data(
         else:
             tend = 0.0
 
-        raw_vals.append([vol, imp, cal, h_mean, colab, tend])
+        raw_vals.append([vol, imp, cal, h_mean, tend])
         dept_names.append(ctx["departamento"])
 
     if raw_vals:
@@ -801,6 +805,45 @@ def _make_kpi_block(title: str, subtitle: str, kpis: dict) -> html.Div:
     ])
 
 
+def _make_custom_kpi_block(
+    title: str, subtitle: str, kpis: dict, cards: list[str],
+) -> html.Div:
+    """Bloque KPI con título/subtítulo propios y un subconjunto de tarjetas."""
+    return html.Div([
+        html.Div([
+            html.H4(title, className="section-header-title"),
+            html.P(subtitle, className="section-header-subtitle"),
+        ], className="section-header-inline"),
+        create_kpi_row_custom(kpis, cards),
+    ])
+
+
+def _make_division_summary_blocks(kpis_division: dict) -> html.Div:
+    """Resumen general consolidado: dos bloques (Universidad y División).
+
+    TODO(datos): hoy NO existe una métrica de publicaciones/citas a nivel
+    UNIVERSIDAD distinta de la DIVISIÓN. ``_compute_global_kpis`` agrega
+    únicamente las publicaciones de los departamentos de la División de
+    Ciencias Básicas (vía ``queries.get_publicaciones``); no hay un dataset que
+    cubra a toda la Universidad del Norte. Por eso ambos bloques se alimentan
+    del mismo ``kpis_division``. Cuando exista una fuente universidad-wide,
+    calcular sus KPIs por separado y pasarlos al bloque "Universidad".
+    """
+    upper_uni = _make_custom_kpi_block(
+        "Indicadores de la Universidad del Norte",
+        "Indicadores institucionales de producción, impacto y calidad de fuente.",
+        kpis_division,
+        cards=["publicaciones_uni", "citas_uni", "pct_q1q2", "h_index_uni"],
+    )
+    upper_div = _make_custom_kpi_block(
+        "Indicadores de la División de Ciencias Básicas",
+        "Vista consolidada de producción, impacto y calidad de fuente de la División.",
+        kpis_division,
+        cards=["publicaciones_div", "citas_div", "pct_q1q2", "h_index"],
+    )
+    return html.Div([upper_uni, upper_div])
+
+
 # ---------------------------------------------------------------------------
 # Callback 1: poblar filtros
 # ---------------------------------------------------------------------------
@@ -854,7 +897,7 @@ def update_filter_options(active_view, departamento_value, profesor_actual):
     Output("content-fuentes",      "children"),
     Output("content-colaboracion", "children"),
     Output("content-benchmarking", "children"),
-    Output("content-matching",     "children"),
+    # Output("content-matching",   "children"),  # vista "Calidad de Datos" oculta
     Output("content-explorador",   "children"),
     Input("store-active-view",     "data"),
     Input("filter-departamento",   "value"),
@@ -909,12 +952,12 @@ def update_dashboard_content(
             kpis_context = _compute_profesor_kpis(profesor_id, anios_value, tipos, cuartiles)
             kpis_context["h_index_label"] = f"H-index Profesor{suffix}"
             upper_block = _make_kpi_block(
-                f"Resumen · {dept_name}",
-                "Indicadores del departamento para el período y filtros activos.",
+                f"Indicadores · {dept_name}",
+                "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_upper,
             )
             context_block = _make_kpi_block(
-                f"Resumen · {prof_name}",
+                f"Indicadores · {prof_name}",
                 "Indicadores individuales del profesor para el período filtrado.",
                 kpis_context,
             )
@@ -926,14 +969,10 @@ def update_dashboard_content(
             kpis_division["h_index_label"] = f"H-index{suffix}" if suffix else "H-index División"
             kpis_dept = _compute_global_kpis(anios_value, tipos, cuartiles, departamento_id=departamento_id)
             kpis_dept["h_index_label"] = f"H-index Depto.{suffix}"
-            upper_block = _make_kpi_block(
-                "Resumen ejecutivo de la División",
-                "Vista consolidada de producción, impacto y calidad de fuente por departamento.",
-                kpis_division,
-            )
+            upper_block = _make_division_summary_blocks(kpis_division)
             context_block = _make_kpi_block(
-                f"Resumen · {dept_name}",
-                "Indicadores del departamento para el período y filtros activos.",
+                f"Indicadores · {dept_name}",
+                "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_dept,
             )
 
@@ -941,15 +980,12 @@ def update_dashboard_content(
             # Caso 1: sin filtro
             kpis_division = _compute_global_kpis(anios_value, tipos, cuartiles)
             kpis_division["h_index_label"] = f"H-index{suffix}" if suffix else "H-index División"
-            upper_block = _make_kpi_block(
-                "Resumen ejecutivo de la División",
-                "Vista consolidada de producción, impacto y calidad de fuente por departamento.",
-                kpis_division,
-            )
+            upper_block = _make_division_summary_blocks(kpis_division)
             context_block = html.Div(style={"display": "none"})
 
         c_resumen = c_profesor = c_impacto = c_fuentes = no_update
-        c_colab   = c_bench   = c_matching = c_explorador = no_update
+        c_colab   = c_bench   = c_explorador = no_update
+        c_matching = no_update  # vista "Calidad de Datos" oculta (no se emite como Output)
 
         if active_tab == "tab-resumen":
             c_resumen = layout_resumen(
@@ -984,8 +1020,9 @@ def update_dashboard_content(
                 _build_benchmarking_data(departamento_id, profesor_id, anios_value, tipos, cuartiles)
             )
 
-        elif active_tab == "tab-matching":
-            c_matching = layout_matching(_build_matching_data())
+        # Vista "Calidad de Datos" oculta temporalmente; se conserva la lógica.
+        # elif active_tab == "tab-matching":
+        #     c_matching = layout_matching(_build_matching_data())
 
         elif active_tab == "tab-explorador":
             c_explorador = layout_explorador(base_df)
@@ -993,20 +1030,19 @@ def update_dashboard_content(
         return (
             upper_block, context_block,
             c_resumen, c_profesor, c_impacto,
-            c_fuentes, c_colab, c_bench, c_matching, c_explorador,
+            c_fuentes, c_colab, c_bench, c_explorador,
         )
 
     except Exception as exc:
         logger.exception("Error actualizando dashboard: %s", exc)
 
-        empty_upper = _make_kpi_block(
-            "Resumen ejecutivo de la División", "",
+        empty_upper = _make_division_summary_blocks(
             metrics.generar_kpis_resumen(pd.DataFrame(), h_index=None),
         )
         return (
             empty_upper, html.Div(style={"display": "none"}),
             no_update, no_update, no_update, no_update,
-            no_update, no_update, no_update, no_update,
+            no_update, no_update, no_update,
         )
 
 
@@ -1016,7 +1052,8 @@ def update_dashboard_content(
 
 _NAV_TABS = [
     "tab-resumen", "tab-profesor", "tab-impacto", "tab-fuentes",
-    "tab-colaboracion", "tab-benchmarking", "tab-matching", "tab-explorador",
+    "tab-colaboracion", "tab-benchmarking", "tab-explorador",
+    # "tab-matching" oculto temporalmente (ver _NAV_ITEMS en index.py).
 ]
 
 _BREADCRUMB_LABELS = {
@@ -1026,7 +1063,7 @@ _BREADCRUMB_LABELS = {
     "tab-fuentes":      "Calidad de Fuente",
     "tab-colaboracion": "Colaboración",
     "tab-benchmarking": "Rankings",
-    "tab-matching":     "Calidad de Datos",
+    # "tab-matching":   "Calidad de Datos",  # oculto temporalmente
     "tab-explorador":   "Explorador",
 }
 
@@ -1102,6 +1139,28 @@ def _constrain_hasta_options(desde_value, hasta_value):
     hasta = hasta_value if hasta_value is not None else _ANIO_MAX_RESET
     options = [{"label": str(y), "value": y} for y in range(desde, _ANIO_MAX_RESET + 1)]
     return options, max(hasta, desde)
+
+
+# ---------------------------------------------------------------------------
+# Callback: reordenar el ranking de Rankings/Benchmarking
+#
+# El ranking se renderiza dentro del Output "content-benchmarking" del callback
+# principal. Para evitar una dependencia circular (el selector vive dentro de
+# ese mismo Output), el DataFrame se guarda en "store-ranking-data" al construir
+# la tarjeta y este callback dedicado reordena la tabla a partir del Store y del
+# selector, sin reconsultar datos.
+# ---------------------------------------------------------------------------
+
+
+@app.callback(
+    Output("ranking-table-body",   "children"),
+    Output("ranking-sort-caption", "children"),
+    Input("ranking-sort-metric",   "value"),
+    Input("store-ranking-data",    "data"),
+)
+def _update_ranking_table(sort_by, data):
+    df = pd.DataFrame(data) if data else pd.DataFrame()
+    return build_ranking_table_body(df, sort_by), ranking_caption(sort_by)
 
 
 # ---------------------------------------------------------------------------
