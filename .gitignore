@@ -30,6 +30,11 @@ logs/*.log
 # Archivos basura
 /python
 
+# Backups / dumps de base de datos (nunca subir)
+backups/
+*.dump
+*.sql.gz
+
 # Jupyter
 .ipynb_checkpoints/
 

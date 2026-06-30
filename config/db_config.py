@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from config.settings import DATABASE_URL, DB_NAME, DB_SCHEMA, DB_USER
+from config.settings import DATABASE_URL, DB_NAME, DB_SCHEMA, DB_SSLMODE, DB_USER
 
 # ---------------------------------------------------------------------------
 # Validación interna
@@ -49,11 +49,15 @@ def _get_or_create_engine() -> Engine:
     global _engine
     if _engine is None:
         _validate_connection_config()
+        connect_args: dict[str, str] = {}
+        if DB_SSLMODE:
+            connect_args["sslmode"] = DB_SSLMODE
         _engine = create_engine(
             DATABASE_URL,
             echo=False,
             pool_size=5,
             pool_pre_ping=True,
+            connect_args=connect_args,
         )
 
         @event.listens_for(_engine, "connect")

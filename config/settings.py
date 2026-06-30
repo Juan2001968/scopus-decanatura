@@ -41,6 +41,24 @@ DATABASE_URL: str = (
     f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
 
+
+def _host_requires_ssl(host: str) -> bool:
+    """Indica si el host corresponde a una BD gestionada de Render.
+
+    Cubre tanto el host externo (``*.oregon-postgres.render.com``) como el
+    host interno (``dpg-xxxxxxxx-a``), ambos sirven sobre SSL.
+    """
+    return "render.com" in host or host.startswith("dpg-")
+
+
+DB_SSLMODE: str | None = os.getenv("DB_SSLMODE") or (
+    "require" if _host_requires_ssl(DB_HOST) else None
+)
+"""Modo SSL para psycopg2. ``None`` en local (no se fuerza SSL); ``require`` en Render.
+
+Se puede sobrescribir con la variable de entorno ``DB_SSLMODE``.
+"""
+
 # ---------------------------------------------------------------------------
 # API de Scopus
 # ---------------------------------------------------------------------------
