@@ -112,6 +112,7 @@ def get_publicaciones(
     profesor_id: Optional[int] = None,
     tipo_documental: Optional[str] = None,
     solo_ventana_rolling: bool = False,
+    solo_division: bool = False,
 ) -> pd.DataFrame:
     """Consulta principal de publicaciones con filtros opcionales.
 
@@ -138,6 +139,15 @@ def get_publicaciones(
     solo_ventana_rolling:
         Si ``True``, filtra por la ventana movil de
         ``ROLLING_WINDOW_YEARS`` anios (incluido el actual).
+    solo_division:
+        Si ``True``, restringe el resultado a las publicaciones que tienen
+        al menos un profesor de la Division de Ciencias Basicas vinculado
+        (es decir, con registro en ``publicacion_profesor``).  La tabla
+        ``publicacion`` contiene TODAS las publicaciones de la Universidad
+        del Norte (descarga por ``AF-ID`` institucional), por lo que sin
+        este filtro se cuentan publicaciones de otras facultades.  No tiene
+        efecto si ya se filtra por ``departamento_id`` o ``profesor_id``,
+        pues esos filtros ya restringen a la Division.
 
     Returns
     -------
@@ -223,6 +233,18 @@ EXISTS (
           AND pr2.id_departamento = :depto_id
     )""")
         params["depto_id"] = departamento_id
+
+    # Alcance "solo Division": cuando no se filtra por departamento ni por
+    # profesor, restringir a publicaciones con al menos un profesor de la
+    # Division vinculado.  Sin esto se contarian todas las publicaciones de
+    # la Universidad del Norte presentes en la tabla ``publicacion``.
+    if solo_division and profesor_id is None and departamento_id is None:
+        where.append(f"""\
+EXISTS (
+        SELECT 1
+        FROM {_S}.publicacion_profesor pp_div
+        WHERE pp_div.id_publicacion = p.id_publicacion
+    )""")
 
     where_sql = ""
     if where:

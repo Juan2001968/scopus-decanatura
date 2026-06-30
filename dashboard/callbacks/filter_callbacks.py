@@ -201,9 +201,15 @@ def _fetch_publicaciones(
     cuartiles: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     anio_min, anio_max = _safe_year_range(anios)
+    # Cuando no hay filtro de departamento ni de profesor, el agregado
+    # representa la Division completa.  Como la tabla ``publicacion`` contiene
+    # todas las publicaciones de la Universidad del Norte, restringimos a las
+    # vinculadas a profesores de la Division mediante ``solo_division``.
+    solo_division = departamento_id is None and profesor_id is None
     df = queries.get_publicaciones(
         anio_min=anio_min, anio_max=anio_max,
         departamento_id=departamento_id, profesor_id=profesor_id,
+        solo_division=solo_division,
     )
     if not isinstance(df, pd.DataFrame):
         return pd.DataFrame()
@@ -819,29 +825,23 @@ def _make_custom_kpi_block(
 
 
 def _make_division_summary_blocks(kpis_division: dict) -> html.Div:
-    """Resumen general consolidado: dos bloques (Universidad y División).
+    """Resumen general consolidado: un único bloque de la División.
 
-    TODO(datos): hoy NO existe una métrica de publicaciones/citas a nivel
-    UNIVERSIDAD distinta de la DIVISIÓN. ``_compute_global_kpis`` agrega
-    únicamente las publicaciones de los departamentos de la División de
-    Ciencias Básicas (vía ``queries.get_publicaciones``); no hay un dataset que
-    cubra a toda la Universidad del Norte. Por eso ambos bloques se alimentan
-    del mismo ``kpis_division``. Cuando exista una fuente universidad-wide,
-    calcular sus KPIs por separado y pasarlos al bloque "Universidad".
+    NOTA(datos): el conjunto de datos cubre EXCLUSIVAMENTE la División de
+    Ciencias Básicas (sus tres departamentos y sus profesores). No existe una
+    métrica universidad-wide distinta de la División, por lo que se eliminó el
+    bloque duplicado "Indicadores de la Universidad del Norte" que mostraba
+    exactamente las mismas cifras. Si en el futuro se incorpora una fuente que
+    cubra a toda la Universidad del Norte, calcular sus KPIs por separado y
+    añadir aquí un bloque "Universidad" con esos valores.
     """
-    upper_uni = _make_custom_kpi_block(
-        "Indicadores de la Universidad del Norte",
-        "Indicadores institucionales de producción, impacto y calidad de fuente.",
-        kpis_division,
-        cards=["publicaciones_uni", "citas_uni", "pct_q1q2", "h_index_uni"],
-    )
     upper_div = _make_custom_kpi_block(
         "Indicadores de la División de Ciencias Básicas",
         "Vista consolidada de producción, impacto y calidad de fuente de la División.",
         kpis_division,
         cards=["publicaciones_div", "citas_div", "pct_q1q2", "h_index"],
     )
-    return html.Div([upper_uni, upper_div])
+    return html.Div([upper_div])
 
 
 # ---------------------------------------------------------------------------
