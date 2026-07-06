@@ -84,20 +84,68 @@ def _exec(sql: str, params: Optional[dict] = None) -> pd.DataFrame:
         return pd.read_sql(text(sql), conn, params=params or {})
 
 
-def _empty(columns: List[str]) -> pd.DataFrame:
+def _empty(columns: List[str], error: Optional[str] = None) -> pd.DataFrame:
     """Retorna un DataFrame vacio con las columnas indicadas.
 
     Parameters
     ----------
     columns:
         Lista de nombres de columna.
+    error:
+        Si la consulta fallo, descripcion del error.  Se adjunta en
+        ``df.attrs["error"]`` para que la capa de presentacion pueda
+        distinguir "sin datos" de "consulta fallida" (y no mostrar
+        ceros enganosos).
 
     Returns
     -------
     pd.DataFrame
         DataFrame vacio con las columnas especificadas.
     """
-    return pd.DataFrame(columns=columns)
+    df = pd.DataFrame(columns=columns)
+    if error:
+        df.attrs["error"] = error
+    return df
+
+
+def _describe_db_error(exc: Exception) -> str:
+    """Mensaje legible para errores de la capa de datos.
+
+    Detecta el caso especifico de encoding (bytes Latin-1 en una BD que
+    se lee como UTF-8), que de otro modo aparece como un criptico
+    ``'utf-8' codec can't decode byte ...``.
+    """
+    msg = str(exc)
+    if "codec can't decode" in msg:
+        return (
+            "La base de datos contiene texto con codificacion invalida "
+            "(bytes no UTF-8, probablemente datos cargados como Latin-1). "
+            "Hay que recargar los datos con encoding UTF-8. "
+            f"Detalle: {msg}"
+        )
+    return msg
+
+
+def probe_database() -> dict:
+    """Diagnostico rapido de la conexion y las tablas principales.
+
+    Returns
+    -------
+    dict
+        ``ok`` (bool), ``error`` (str o None) y ``tablas`` (dict
+        nombre → conteo de filas, o None si la tabla no se pudo leer).
+    """
+    resumen: dict = {"ok": True, "error": None, "tablas": {}}
+    for tabla in ("departamento", "profesor", "publicacion", "publicacion_profesor"):
+        try:
+            df = _exec(f"SELECT COUNT(*) AS n FROM {_S}.{tabla}")
+            resumen["tablas"][tabla] = int(df.iloc[0]["n"])
+        except Exception as exc:
+            resumen["ok"] = False
+            resumen["error"] = _describe_db_error(exc)
+            resumen["tablas"][tabla] = None
+    logger.info("probe_database: %s", resumen)
+    return resumen
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +313,7 @@ EXISTS (
         df = _exec(sql, params)
     except Exception as exc:
         logger.error("Error en get_publicaciones: %s", exc)
-        return _empty(expected_cols)
+        return _empty(expected_cols, error=_describe_db_error(exc))
 
     filtros_desc = params.copy()
     if solo_ventana_rolling:
@@ -338,7 +386,7 @@ ORDER BY d.nombre, pr.nombre_normalizado"""
         df = _exec(sql, params)
     except Exception as exc:
         logger.error("Error en get_profesores: %s", exc)
-        return _empty(cols)
+        return _empty(cols, error=_describe_db_error(exc))
 
     logger.info(
         "get_profesores: %d registros (depto=%s, solo_activos=%s)",
@@ -367,7 +415,7 @@ ORDER BY nombre"""
         df = _exec(sql)
     except Exception as exc:
         logger.error("Error en get_departamentos: %s", exc)
-        return _empty(cols)
+        return _empty(cols, error=_describe_db_error(exc))
 
     logger.info("get_departamentos: %d registros", len(df))
     return df

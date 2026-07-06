@@ -42,17 +42,56 @@ _COL_NAMES = {
 }
 
 
+def _debug_etapas_alert(df: pd.DataFrame) -> html.Div | None:
+    """Panel de depuración: registros restantes tras cada etapa de filtrado.
+
+    Los conteos vienen en ``df.attrs["etapas"]`` (los adjunta
+    ``_fetch_publicaciones``); permiten ver en qué filtro "se caen" los datos.
+    """
+    etapas = df.attrs.get("etapas") if isinstance(df, pd.DataFrame) else None
+    if not etapas:
+        return None
+    return dbc.Alert(
+        [
+            html.Strong("Depuración de filtros — registros tras cada etapa: "),
+            f"consulta SQL (años + área/profesor): {etapas.get('consulta_sql', '—')} · "
+            f"tras tipo documental: {etapas.get('tras_tipo', '—')} · "
+            f"tras cuartil SJR: {etapas.get('tras_cuartil', '—')}",
+        ],
+        color="secondary",
+        className="mb-2",
+        style={"fontSize": "12px"},
+    )
+
+
 def layout_explorador(df: pd.DataFrame) -> html.Div:
     logger.info("Renderizando layout_explorador (%d filas)", len(df))
 
-    if df.empty:
-        return html.Div(
+    debug_alert = _debug_etapas_alert(df)
+    error = df.attrs.get("error") if isinstance(df, pd.DataFrame) else None
+
+    if error:
+        return html.Div([
             dbc.Alert(
-                "No hay datos disponibles para los filtros seleccionados.",
-                color="info",
-                className="text-center mt-4 mx-3",
+                [html.Strong("No se pudo consultar la base de datos. "),
+                 f"Detalle técnico: {error}"],
+                color="danger",
+                className="mt-4 mx-3",
             ),
-        )
+        ])
+
+    if df.empty:
+        return html.Div([
+            c for c in [
+                debug_alert,
+                dbc.Alert(
+                    "No hay publicaciones para esta combinación de filtros. "
+                    "Ajusta o limpia los filtros para ampliar los resultados.",
+                    color="info",
+                    className="text-center mt-4 mx-3",
+                ),
+            ] if c is not None
+        ])
 
     # Seleccionar columnas disponibles en orden preferido
     cols_disp  = [c for c in _COLS_PREFERIDAS if c in df.columns]
@@ -83,6 +122,7 @@ def layout_explorador(df: pd.DataFrame) -> html.Div:
         ], className="section-header-inline"),
 
         html.Div([
+            *( [debug_alert] if debug_alert is not None else [] ),
             # Nota informativa + instrucciones de exportación
             dbc.Alert(
                 [

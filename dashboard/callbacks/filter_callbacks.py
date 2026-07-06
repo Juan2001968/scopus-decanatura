@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+import dash_bootstrap_components as dbc
 import pandas as pd
 from dash import ALL, Input, Output, State, callback_context, html, no_update
 
@@ -66,6 +67,19 @@ def _year_suffix(anios: object) -> str:
     if y0 == y1:
         return f" ({y0})"
     return f" ({y0}–{y1})"
+
+
+def _df_error(df: object) -> Optional[str]:
+    """Mensaje de error adjuntado por la capa de datos (``queries.py``).
+
+    Las funciones ``get_*`` marcan en ``df.attrs["error"]`` cuando la
+    consulta fallo; asi la UI puede distinguir "sin datos" de "la BD no
+    respondio" en vez de mostrar ceros enganosos.
+    """
+    if isinstance(df, pd.DataFrame):
+        err = df.attrs.get("error")
+        return str(err) if err else None
+    return None
 
 
 def _normalize_multi(value: object) -> list[str]:
@@ -180,7 +194,7 @@ def _get_context_h_index(
         value = prof_row.get("h_index")
         if pd.isna(value):
             return None
-        return int(value)
+        return _safe_int(value)
 
     df_prof = _get_profesores_df(departamento_id=departamento_id)
     if df_prof.empty or "h_index" not in df_prof.columns:
@@ -201,6 +215,11 @@ def _fetch_publicaciones(
     cuartiles: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     anio_min, anio_max = _safe_year_range(anios)
+    # El filtro de profesor prevalece sobre el de area: el selector de
+    # profesores ya esta restringido al area elegida, y un desfase transitorio
+    # entre ambos dropdowns no debe dejar el perfil en cero por el AND en SQL.
+    if profesor_id is not None:
+        departamento_id = None
     # Cuando no hay filtro de departamento ni de profesor, el agregado
     # representa la Division completa.  Como la tabla ``publicacion`` contiene
     # todas las publicaciones de la Universidad del Norte, restringimos a las
@@ -213,10 +232,28 @@ def _fetch_publicaciones(
     )
     if not isinstance(df, pd.DataFrame):
         return pd.DataFrame()
+    error = _df_error(df)
+    n_sql = len(df)
     df = _apply_tipo_filter(df, tipos)
+    n_tipo = len(df)
     if cuartiles:
         df = _apply_cuartil_filter(df, cuartiles)
-    return df.reset_index(drop=True)
+    n_cuartil = len(df)
+    logger.info(
+        "_fetch_publicaciones: SQL=%d -> tras tipo=%d -> tras cuartil=%d "
+        "(depto=%s, prof=%s, anios=%s-%s, tipos=%s, cuartiles=%s)",
+        n_sql, n_tipo, n_cuartil, departamento_id, profesor_id,
+        anio_min, anio_max, tipos or "-", cuartiles or "-",
+    )
+    df = df.reset_index(drop=True)
+    if error:
+        df.attrs["error"] = error
+    df.attrs["etapas"] = {
+        "consulta_sql": n_sql,
+        "tras_tipo": n_tipo,
+        "tras_cuartil": n_cuartil,
+    }
+    return df
 
 
 def _get_department_contexts(
@@ -392,6 +429,7 @@ def _build_profesor_data(
 
     return {
         "info":                   info,
+        "error":                  _df_error(df),
         "kpis":                   metrics.generar_kpis_resumen(df, h_index=_get_context_h_index(departamento_id, profesor_id)),
         "publicaciones":          df,
         "top_fuentes":            _build_top_fuentes_df(df, top_n=10),
@@ -896,6 +934,78 @@ def _make_division_summary_blocks(
     return html.Div([upper_uni, upper_div])
 
 
+def _data_error_banner(error: str) -> html.Div:
+    """Aviso visible cuando la capa de datos fallo.
+
+    Sustituye a los KPI en 0/"—" que antes se mostraban ante cualquier
+    fallo de la BD y que eran indistinguibles de "no hay publicaciones".
+    """
+    return html.Div(
+        dbc.Card(
+            dbc.CardBody(html.Div([
+                html.Div("No se pudo consultar la base de datos",
+                         className="empty-state-title"),
+                html.P(
+                    "Los indicadores no pueden calcularse en este momento. "
+                    "No es un problema de los filtros seleccionados: la fuente "
+                    "de datos no está respondiendo correctamente.",
+                    className="empty-state-text",
+                ),
+                html.P(f"Detalle técnico: {error}",
+                       className="empty-state-text",
+                       style={"fontSize": "12px", "opacity": 0.8}),
+            ], className="empty-state")),
+            className="pretty-card",
+        ),
+        className="page-section",
+    )
+
+
+def _filtros_activos_descripcion(
+    departamento_id: Optional[int],
+    profesor_id: Optional[int],
+    anios: object,
+    tipos: list[str],
+    cuartiles: Optional[list[str]],
+) -> str:
+    partes: list[str] = []
+    if profesor_id is not None:
+        prof_row = _get_profesor_row(profesor_id)
+        nombre = (
+            str(prof_row.get("nombre_normalizado"))
+            if prof_row is not None else f"id {profesor_id}"
+        )
+        partes.append(f"profesor: {nombre}")
+    if departamento_id is not None:
+        partes.append(f"área: {_get_departamento_nombre(departamento_id)}")
+    y0, y1 = _safe_year_range(anios)
+    partes.append(f"período: {y0}–{y1}")
+    if tipos:
+        partes.append("tipo: " + ", ".join(tipos))
+    if cuartiles:
+        partes.append("cuartil: " + ", ".join(cuartiles))
+    return " · ".join(partes)
+
+
+def _no_results_notice(descripcion: str) -> html.Div:
+    """Mensaje claro cuando la combinación de filtros deja 0 resultados."""
+    return html.Div(
+        dbc.Card(
+            dbc.CardBody(html.Div([
+                html.Div("No hay publicaciones para esta combinación de filtros",
+                         className="empty-state-title"),
+                html.P(
+                    f"Filtros activos → {descripcion}. Ajusta o limpia los "
+                    "filtros para ampliar los resultados.",
+                    className="empty-state-text",
+                ),
+            ], className="empty-state")),
+            className="pretty-card",
+        ),
+        className="mb-3",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Callback 1: poblar filtros
 # ---------------------------------------------------------------------------
@@ -915,24 +1025,45 @@ def update_filter_options(active_view, departamento_value, profesor_actual):
     try:
         departamento_id = _safe_int(departamento_value)
 
+        # Cada consulta se maneja por separado: si una falla, se conservan
+        # las opciones previas del dropdown (no_update) en vez de vaciarlas.
         df_dept = _get_departamentos_df()
-        dept_options = _to_options(df_dept, "id_departamento", "nombre")
+        dept_options = (
+            no_update if _df_error(df_dept)
+            else _to_options(df_dept, "id_departamento", "nombre")
+        )
 
         df_prof = _get_profesores_df(departamento_id=departamento_id)
-        prof_options = _to_options(df_prof, "id_profesor", "nombre_normalizado")
+        profesor_id_actual = _safe_int(profesor_actual)
+        if _df_error(df_prof):
+            # La lista de profesores no se pudo cargar: conservar opciones y,
+            # sobre todo, NO borrar la selección del usuario (antes esto
+            # reseteaba el profesor a None ante cualquier fallo de la BD, lo
+            # que dejaba el perfil en "Selecciona un profesor").
+            logger.warning(
+                "Lista de profesores no disponible; se conserva la selección "
+                "actual (%s). Error: %s",
+                profesor_id_actual, _df_error(df_prof),
+            )
+            prof_options = no_update
+            profesor_value = no_update
+        else:
+            prof_options = _to_options(df_prof, "id_profesor", "nombre_normalizado")
+            valid_prof_ids = {opt["value"] for opt in prof_options}
+            profesor_value = (
+                profesor_id_actual if profesor_id_actual in valid_prof_ids else None
+            )
 
         df_tipos = queries.get_publicaciones(departamento_id=departamento_id)
         df_tipos = df_tipos if isinstance(df_tipos, pd.DataFrame) else pd.DataFrame()
-        tipo_options = _tipo_options(df_tipos)
-
-        valid_prof_ids = {opt["value"] for opt in prof_options}
-        profesor_value = profesor_actual if profesor_actual in valid_prof_ids else None
+        tipo_options = no_update if _df_error(df_tipos) else _tipo_options(df_tipos)
 
         return dept_options, prof_options, tipo_options, profesor_value
 
     except Exception as exc:
+        # Nunca vaciar filtros ni selección por un error de este callback.
         logger.exception("Error actualizando opciones de filtros: %s", exc)
-        return [], [], [], None
+        return no_update, no_update, no_update, no_update
 
 
 # ---------------------------------------------------------------------------
@@ -968,9 +1099,11 @@ def update_dashboard_content(
         profesor_id     = _safe_int(profesor_value)
         tipos           = _normalize_multi(tipos_value)
         cuartiles       = _normalize_multi(cuartil_value)
+        anio_desde_i    = _safe_int(anio_desde)
+        anio_hasta_i    = _safe_int(anio_hasta)
         anios_value     = [
-            anio_desde if anio_desde is not None else 2014,
-            anio_hasta if anio_hasta is not None else 2025,
+            anio_desde_i if anio_desde_i is not None else _ANIO_MIN_RESET,
+            anio_hasta_i if anio_hasta_i is not None else _ANIO_MAX_RESET,
         ]
 
         base_df = _fetch_publicaciones(
@@ -980,6 +1113,24 @@ def update_dashboard_content(
             tipos=tipos,
             cuartiles=cuartiles,
         )
+
+        # Si la capa de datos falló, mostrar un aviso claro en vez de KPIs en
+        # 0/"—" que parecen datos legítimos. El tab activo recibe el mismo
+        # aviso (evita que "Perfil Profesor" quede en su placeholder inicial).
+        data_error = _df_error(base_df)
+        if data_error:
+            logger.error("Capa de datos no disponible: %s", data_error)
+            contents = {t: no_update for t in _NAV_TABS}
+            if active_tab in contents:
+                contents[active_tab] = _data_error_banner(data_error)
+            return (
+                _data_error_banner(data_error),
+                html.Div(style={"display": "none"}),
+                contents["tab-resumen"], contents["tab-profesor"],
+                contents["tab-impacto"], contents["tab-fuentes"],
+                contents["tab-colaboracion"], contents["tab-benchmarking"],
+                contents["tab-explorador"],
+            )
 
         # --- Bloques KPI según jerarquía de filtros ---
         suffix = _year_suffix(anios_value)
@@ -1035,6 +1186,14 @@ def update_dashboard_content(
             upper_block = _make_division_summary_blocks(kpis_division, _compute_universidad_kpis())
             context_block = html.Div(style={"display": "none"})
 
+        # Cero resultados legítimos (la BD respondió pero la combinación de
+        # filtros no deja registros): avisar de forma explícita.
+        if base_df.empty:
+            aviso = _no_results_notice(_filtros_activos_descripcion(
+                departamento_id, profesor_id, anios_value, tipos, cuartiles,
+            ))
+            upper_block = html.Div([aviso, upper_block])
+
         c_resumen = c_profesor = c_impacto = c_fuentes = no_update
         c_colab   = c_bench   = c_explorador = no_update
         c_matching = no_update  # vista "Calidad de Datos" oculta (no se emite como Output)
@@ -1088,12 +1247,12 @@ def update_dashboard_content(
     except Exception as exc:
         logger.exception("Error actualizando dashboard: %s", exc)
 
-        empty_upper = _make_division_summary_blocks(
-            metrics.generar_kpis_resumen(pd.DataFrame(), h_index=None),
-            _compute_universidad_kpis(),
-        )
+        # Antes este fallback pintaba los KPIs de la División con un DataFrame
+        # vacío (todo 0/"—"), indistinguible de datos reales. Ahora se muestra
+        # un aviso de error explícito.
         return (
-            empty_upper, html.Div(style={"display": "none"}),
+            _data_error_banner(f"Error interno del dashboard: {exc}"),
+            html.Div(style={"display": "none"}),
             no_update, no_update, no_update, no_update,
             no_update, no_update, no_update,
         )

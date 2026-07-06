@@ -58,6 +58,10 @@ def _get_or_create_engine() -> Engine:
             pool_size=5,
             pool_pre_ping=True,
             connect_args=connect_args,
+            # Codificacion explicita: si la BD contiene bytes no UTF-8 el
+            # fallo es deterministico y detectable, en vez de depender del
+            # client_encoding por defecto del entorno.
+            client_encoding="utf8",
         )
 
         @event.listens_for(_engine, "connect")

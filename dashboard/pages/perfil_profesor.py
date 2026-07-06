@@ -49,8 +49,17 @@ def _apply_layout(fig, height: int = 380):
 
 
 def layout_profesor(data: Optional[dict] = None) -> html.Div:
+    # Tres estados diferenciados: (1) sin profesor seleccionado,
+    # (2) la consulta a la BD falló, (3) profesor sin publicaciones para
+    # los filtros activos. Antes los tres acababan viéndose como un perfil
+    # vacío o como el placeholder inicial.
     if data is None:
         return _placeholder_sin_profesor()
+
+    error = data.get("error")
+    if error:
+        logger.error("layout_profesor: error de datos: %s", error)
+        return _placeholder_error_datos(str(error))
 
     logger.info("Renderizando layout_profesor")
 
@@ -60,6 +69,12 @@ def layout_profesor(data: Optional[dict] = None) -> html.Div:
     top_fuentes    = data.get("top_fuentes", pd.DataFrame())
     dist_cuartiles = data.get("distribucion_cuartiles", pd.DataFrame())
     publicaciones  = data.get("publicaciones", pd.DataFrame())
+
+    if publicaciones is None or publicaciones.empty:
+        return html.Div([
+            _header_profesor(info),
+            _placeholder_sin_publicaciones(),
+        ])
 
     return html.Div([
         _header_profesor(info),
@@ -371,6 +386,42 @@ def _placeholder_sin_profesor() -> html.Div:
             dbc.CardBody(html.Div([
                 html.Div("Selecciona un profesor", className="empty-state-title"),
                 html.P("Usa el filtro superior para ver el perfil bibliométrico individual.",
+                       className="empty-state-text"),
+            ], className="empty-state")),
+            className="pretty-card",
+        ),
+        className="page-section",
+    )
+
+
+def _placeholder_error_datos(error: str) -> html.Div:
+    return html.Div(
+        dbc.Card(
+            dbc.CardBody(html.Div([
+                html.Div("No se pudo consultar la base de datos",
+                         className="empty-state-title"),
+                html.P("El perfil no puede calcularse en este momento. No es un "
+                       "problema del profesor seleccionado: la fuente de datos no "
+                       "está respondiendo correctamente.",
+                       className="empty-state-text"),
+                html.P(f"Detalle técnico: {error}", className="empty-state-text",
+                       style={"fontSize": "12px", "opacity": 0.8}),
+            ], className="empty-state")),
+            className="pretty-card",
+        ),
+        className="page-section",
+    )
+
+
+def _placeholder_sin_publicaciones() -> html.Div:
+    return html.Div(
+        dbc.Card(
+            dbc.CardBody(html.Div([
+                html.Div("No hay publicaciones para esta combinación de filtros",
+                         className="empty-state-title"),
+                html.P("El profesor no tiene publicaciones registradas dentro del "
+                       "período, tipo documental o cuartil seleccionados. Amplía el "
+                       "rango de años o limpia los filtros para ver su producción.",
                        className="empty-state-text"),
             ], className="empty-state")),
             className="pretty-card",
