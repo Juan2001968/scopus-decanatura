@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from dashboard.area_style import color_area
 from dashboard.components.data_table import create_data_table
 from src.utils.logger import get_logger
 
@@ -25,11 +26,6 @@ _MUTED     = "#64748b"
 _GRID      = "#e2e8f0"
 _PAPER     = "#ffffff"
 
-COLORES_DEPT: Dict[str, str] = {
-    "Departamento de Matemáticas y Estadística": _PRIMARY,
-    "Departamento de Química y Biología":        _SECONDARY,
-    "Departamento de Física y Geociencias":      _WARNING,
-}
 PALETA_OA = {
     "Gold": "#f59e0b", "Green": "#10b981", "Hybrid": _SECONDARY,
     "Bronze": "#b45309", "Closed": _DANGER,
@@ -64,6 +60,7 @@ def layout_colaboracion(data: dict) -> html.Div:
     coautoria    = data.get("coautoria_red",       pd.DataFrame())
     profesores   = data.get("profesores_red",      pd.DataFrame())
     interinst    = data.get("publicaciones_interinstitucionales", pd.DataFrame())
+    filtros_desc = data.get("filtros_descripcion", "")
 
     return html.Div([
         html.Div([
@@ -78,7 +75,7 @@ def layout_colaboracion(data: dict) -> html.Div:
             # Red de co-autoría (ancho completo).
             # Oculta temporalmente: "Estadísticas de co-autoría" (_card_stats_colaboracion).
             dbc.Row([
-                dbc.Col(_card_red_coautoria(coautoria, profesores), md=12),
+                dbc.Col(_card_red_coautoria(coautoria, profesores, filtros_desc), md=12),
             ], className="g-3 mb-3"),
 
             # Keywords: tabla + barra horizontal
@@ -123,19 +120,35 @@ def _circular_layout(nodes: List) -> Dict:
     }
 
 
-def _card_red_coautoria(coautoria: pd.DataFrame, profesores: pd.DataFrame) -> dbc.Card:
+def _card_red_coautoria(
+    coautoria: pd.DataFrame,
+    profesores: pd.DataFrame,
+    filtros_desc: str = "",
+) -> dbc.Card:
+    """Grafo de co-autoría sobre el conjunto de publicaciones filtrado.
+
+    Las aristas llegan ya recalculadas con los filtros activos (área,
+    profesor, período, tipo, cuartil); ver
+    ``filter_callbacks._build_red_coautoria``.
+    """
+    detalle = f" Filtros activos → {filtros_desc}." if filtros_desc else ""
     if coautoria.empty or profesores.empty:
-        return _card_vacia("Red de co-autoría",
-                           "Sin datos de co-publicaciones entre profesores de la División.")
+        return _card_vacia(
+            "Red de co-autoría entre profesores",
+            "No hay co-publicaciones entre profesores para esta combinación "
+            f"de filtros.{detalle} Ajusta o limpia los filtros para ampliar "
+            "los resultados.",
+        )
 
     node_ids = profesores["id_profesor"].tolist()
     pos = _circular_layout(node_ids)
     prof_map = {row["id_profesor"]: row for _, row in profesores.iterrows()}
     max_h = max(1, profesores["h_index"].fillna(0).max())
-    dept_colors = {row["id_profesor"]: COLORES_DEPT.get(row.get("nombre_departamento", ""), _SECONDARY)
+    dept_colors = {row["id_profesor"]: color_area(row.get("nombre_departamento", ""), _SECONDARY)
                    for _, row in profesores.iterrows()}
 
     edge_x, edge_y = [], []
+    n_dibujadas = 0
     for _, edge in coautoria.iterrows():
         a, b = edge["id_prof_a"], edge["id_prof_b"]
         if a not in pos or b not in pos:
@@ -144,6 +157,14 @@ def _card_red_coautoria(coautoria: pd.DataFrame, profesores: pd.DataFrame) -> db
         x1, y1 = pos[b]
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
+        n_dibujadas += 1
+
+    if n_dibujadas == 0:
+        return _card_vacia(
+            "Red de co-autoría entre profesores",
+            "No hay co-publicaciones entre los profesores visibles para esta "
+            f"combinación de filtros.{detalle}",
+        )
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y, mode="lines",
@@ -159,7 +180,9 @@ def _card_red_coautoria(coautoria: pd.DataFrame, profesores: pd.DataFrame) -> db
         x, y = pos[nid]
         node_x.append(x); node_y.append(y)
         row = prof_map.get(nid, {})
-        h = float(row.get("h_index") or 0)
+        h_raw = row.get("h_index")
+        # pd.isna cubre None y NaN ("NaN or 0" devolvía NaN: NaN es truthy).
+        h = 0.0 if h_raw is None or pd.isna(h_raw) else float(h_raw)
         node_sizes.append(12 + 20 * (h / max_h))
         node_colors.append(dept_colors.get(nid, _SECONDARY))
         name = str(row.get("nombre_normalizado", ""))
@@ -186,10 +209,13 @@ def _card_red_coautoria(coautoria: pd.DataFrame, profesores: pd.DataFrame) -> db
         hoverlabel=dict(bgcolor=_PRIMARY, font_color="white", font_size=12),
     )
 
-    n_aristas = len(coautoria) if not coautoria.empty else 0
+    n_copubs = int(coautoria["n_copubs"].sum()) if "n_copubs" in coautoria.columns else 0
+    subtitulo = (
+        f"Tamaño = h-index · {n_dibujadas} pares con co-autoría · "
+        f"{n_copubs} co-publicaciones en el período/filtros activos"
+    )
     return dbc.Card([
-        _pretty_header("Red de co-autoría entre profesores",
-                       f"Tamaño = h-index · {n_aristas} co-publicaciones detectadas"),
+        _pretty_header("Red de co-autoría entre profesores", subtitulo),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100 network-card")
 

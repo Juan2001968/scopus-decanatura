@@ -901,10 +901,54 @@ ORDER BY cuartil"""
     return df
 
 
+def get_publicacion_profesor_links() -> pd.DataFrame:
+    """Vínculos publicación-profesor con el departamento de cada profesor.
+
+    Tabla ligera (una fila por vínculo) pensada para que la capa de
+    presentación construya la red de co-autoría **a partir del conjunto de
+    publicaciones ya filtrado** (período/tipo/cuartil), garantizando la
+    misma semántica de filtros que el resto de los indicadores.  Ver
+    :func:`src.services.metrics.calcular_coautoria_pares`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columnas: ``id_publicacion``, ``id_profesor``, ``id_departamento``.
+    """
+    cols = ["id_publicacion", "id_profesor", "id_departamento"]
+
+    sql = f"""\
+SELECT
+    pp.id_publicacion,
+    pp.id_profesor,
+    pr.id_departamento
+FROM {_S}.publicacion_profesor pp
+JOIN {_S}.profesor pr
+    ON pp.id_profesor = pr.id_profesor"""
+
+    try:
+        df = _exec(sql)
+    except Exception as exc:
+        logger.error("Error en get_publicacion_profesor_links: %s", exc)
+        return _empty(cols, error=_describe_db_error(exc))
+
+    logger.info("get_publicacion_profesor_links: %d vinculos", len(df))
+    return df
+
+
 def get_coautoria_entre_profesores(
     departamento_id: Optional[int] = None,
 ) -> pd.DataFrame:
     """Pares de profesores que co-publicaron dentro de la División.
+
+    Si se indica ``departamento_id``, exige que **ambos** profesores del
+    par pertenezcan al departamento (antes solo se filtraba el miembro de
+    menor id, lo que incluía pares mixtos de forma asimétrica).
+
+    Nota: el dashboard ya no usa esta función para la red de co-autoría
+    (construye los pares desde el conjunto filtrado con
+    ``get_publicacion_profesor_links`` + ``metrics.calcular_coautoria_pares``);
+    se conserva como consulta de conveniencia sin filtros de período.
 
     Returns
     -------
@@ -918,8 +962,10 @@ def get_coautoria_entre_profesores(
 
     if departamento_id is not None:
         dept_filter = f"""
-JOIN {_S}.profesor pr_f ON pp1.id_profesor = pr_f.id_profesor
-WHERE pr_f.id_departamento = :depto_id"""
+JOIN {_S}.profesor pr_a ON pp1.id_profesor = pr_a.id_profesor
+JOIN {_S}.profesor pr_b ON pp2.id_profesor = pr_b.id_profesor
+WHERE pr_a.id_departamento = :depto_id
+  AND pr_b.id_departamento = :depto_id"""
         params["depto_id"] = departamento_id
 
     sql = f"""\

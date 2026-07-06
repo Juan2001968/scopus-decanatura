@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
-
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from dashboard.area_style import color_area, wrap_area
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,12 +21,6 @@ _TEXT      = "#1e293b"
 _MUTED     = "#64748b"
 _GRID      = "#e2e8f0"
 _PAPER     = "#ffffff"
-
-COLORES_DEPT: Dict[str, str] = {
-    "Departamento de Matemáticas y Estadística": _PRIMARY,
-    "Departamento de Química y Biología":        _SECONDARY,
-    "Departamento de Física y Geociencias":      _WARNING,
-}
 
 _COLORES_CUARTIL = {
     "Q1": _SUCCESS, "Q2": _SECONDARY,
@@ -165,17 +158,22 @@ def _card_cuartiles_stacked(df: pd.DataFrame) -> dbc.Card:
     if df.empty:
         return _card_vacia("Cuartiles por área de investigación", "Sin datos.")
 
+    work = df.copy()
+    # Nombre completo del área envuelto en varias líneas (no truncar).
+    work["departamento_eje"] = work["departamento"].apply(lambda d: wrap_area(d, width=16))
+
     fig = px.bar(
-        df, x="departamento", y="count", color="cuartil",
+        work, x="departamento_eje", y="count", color="cuartil",
         color_discrete_map=_COLORES_CUARTIL, barmode="stack",
-        labels={"departamento": "", "count": "Publicaciones", "cuartil": "Cuartil"},
+        labels={"departamento_eje": "", "count": "Publicaciones", "cuartil": "Cuartil"},
+        custom_data=["departamento"],
     )
     fig.update_traces(
         marker_line_color="white", marker_line_width=1.5,
-        hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
+        hovertemplate="<b>%{customdata[0]}</b><br>%{fullData.name}: %{y}<extra></extra>",
     )
-    _apply_layout(fig, height=320)
-    fig.update_xaxes(tickangle=-10)
+    _apply_layout(fig, height=340)
+    fig.update_xaxes(tickangle=0, automargin=True)
 
     return dbc.Card([
         _pretty_header("Cuartiles por área de investigación",
@@ -194,16 +192,18 @@ def _card_sjr_departamento(df: pd.DataFrame) -> dbc.Card:
 
     fig = go.Figure(go.Bar(
         x=df["sjr_promedio"],
-        y=df["departamento"].apply(
-            lambda d: d.split()[-1][:10] if len(d.split()) >= 1 else d[:10]
-        ),
+        # Nombre completo del área, envuelto con <br> (antes se truncaba a la
+        # última palabra: "Datos", "Química", "Geociencia").
+        y=[wrap_area(d, width=18) for d in df["departamento"]],
         orientation="h",
-        marker_color=[COLORES_DEPT.get(d, _SECONDARY) for d in df["departamento"]],
+        marker_color=[color_area(d) for d in df["departamento"]],
         marker_line_color="white", marker_line_width=1.5,
-        hovertemplate="<b>%{y}</b><br>SJR: <b>%{x:.3f}</b><extra></extra>",
+        customdata=df["departamento"],
+        hovertemplate="<b>%{customdata}</b><br>SJR promedio: <b>%{x:.3f}</b><extra></extra>",
     ))
-    _apply_layout(fig, height=240)
+    _apply_layout(fig, height=280)
     fig.update_layout(showlegend=False)
+    fig.update_yaxes(automargin=True)
 
     return dbc.Card([
         _pretty_header("SJR promedio por área de investigación", "Indicador de impacto de las fuentes"),

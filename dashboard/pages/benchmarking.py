@@ -6,7 +6,6 @@ Ranking de profesores con índice compuesto + radar chart por departamento.
 from __future__ import annotations
 
 import json
-from typing import Dict, List
 
 import dash_bootstrap_components as dbc
 import numpy as np
@@ -14,6 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from dashboard.area_style import pill_area
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,11 +27,6 @@ _TEXT      = "#1A1A2E"
 _GRID      = "#F3F4F6"
 _PAPER     = "#FFFFFF"
 
-COLORES_DEPT: Dict[str, str] = {
-    "Departamento de Matemáticas y Estadística": _PRIMARY,
-    "Departamento de Química y Biología":        _SECONDARY,
-    "Departamento de Física y Geociencias":      _ACCENT,
-}
 PALETA = [_PRIMARY, _SECONDARY, _ACCENT, _SUCCESS, "#8B5CF6", "#EF4444"]
 
 _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
@@ -134,7 +129,7 @@ def build_ranking_table_body(df: pd.DataFrame, sort_by: str = _DEFAULT_SORT):
         rank = int(row["rank"])
         medal = _MEDALS.get(rank, "")
         dept  = str(row.get("departamento", ""))
-        short_dept = dept.split()[-1][:6] if dept else "—"
+        short_dept = pill_area(dept)[0] if dept else "—"
 
         h_val = row.get("h_index")
         c_val = row.get("citas_totales")
@@ -208,12 +203,18 @@ def _card_radar(radar: dict) -> dbc.Card:
     radar = {
         "departamentos": [...],
         "dimensiones": ["Volumen","Impacto","Calidad","h-index","Tendencia"],
-        "valores": [[d1_dim1,...,d1_dim5], [d2_dim1,...], ...]
+        "valores": [[d1_dim1,...,d1_dim5], ...],   # normalizados 0-1 (/ máximo)
+        "crudos":  [[d1_dim1,...,d1_dim5], ...],   # valores sin normalizar
     }
+
+    Las definiciones y la normalización de cada dimensión están
+    documentadas en ``filter_callbacks._build_benchmarking_data`` y en
+    ``docs/definiciones_indicadores.md``.
     """
     deptos = radar.get("departamentos", [])
     dims   = radar.get("dimensiones", [])
     vals   = radar.get("valores", [])
+    crudos = radar.get("crudos", [])
 
     if not deptos or not dims or not vals:
         return _card_vacia("Radar comparativo", "Sin datos para el radar chart.")
@@ -225,6 +226,8 @@ def _card_radar(radar: dict) -> dbc.Card:
         # Cerrar el polígono repitiendo el primer valor
         r_closed = list(row_vals) + [row_vals[0]]
         t_closed = list(dims) + [dims[0]]
+        raw = list(crudos[i]) if i < len(crudos) else [None] * len(row_vals)
+        raw_closed = raw + raw[:1]
 
         fig.add_trace(go.Scatterpolar(
             r=r_closed,
@@ -234,7 +237,10 @@ def _card_radar(radar: dict) -> dbc.Card:
             line=dict(color=color, width=2.5),
             opacity=0.25,
             name=dept,
-            hovertemplate="<b>%{theta}</b>: %{r:.2f}<extra></extra>",
+            customdata=[[f"{v:,.2f}" if isinstance(v, (int, float)) else "—"]
+                        for v in raw_closed],
+            hovertemplate=("<b>%{theta}</b>: %{r:.2f} "
+                           "(valor real: %{customdata[0]})<extra>" + str(dept) + "</extra>"),
         ))
         # Línea sólida sin fill encima
         fig.add_trace(go.Scatterpolar(
@@ -275,7 +281,10 @@ def _card_radar(radar: dict) -> dbc.Card:
     return dbc.Card([
         _pretty_header(
             "Perfil multidimensional por área de investigación",
-            "5 dimensiones normalizadas (0–1): Volumen · Impacto · Calidad · h-index · Tendencia",
+            "Compara siempre las 3 áreas con los filtros de período/tipo/cuartil. "
+            "Cada eje se normaliza por el máximo entre áreas (1.0 = área líder del eje). "
+            "Volumen = publicaciones · Impacto = citas/publicación · Calidad = % Q1+Q2 · "
+            "h-index = promedio profesores · Tendencia = pubs último trienio / trienio anterior",
         ),
         dbc.CardBody(html.Div(
             dcc.Graph(figure=fig, config={"displayModeBar": False}),

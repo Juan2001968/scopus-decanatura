@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
-
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from dashboard.area_style import abreviar_area, color_area, discrete_map, wrap_area
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,11 +22,6 @@ _MUTED     = "#64748b"
 _GRID      = "#e2e8f0"
 _PAPER     = "#ffffff"
 
-COLORES_DEPT: Dict[str, str] = {
-    "Departamento de Matemáticas y Estadística": _PRIMARY,
-    "Departamento de Química y Biología":        _SECONDARY,
-    "Departamento de Física y Geociencias":      _WARNING,
-}
 PALETA = [_PRIMARY, _SECONDARY, _WARNING, _SUCCESS, "#7c3aed", _DANGER]
 
 _PILL = {"Q1": "pill-q1", "Q2": "pill-q2", "Q3": "pill-q3", "Q4": "pill-q4"}
@@ -60,6 +54,7 @@ def layout_impacto(data: dict) -> html.Div:
     citas_anio      = data.get("citas_por_anio",           pd.DataFrame())
     citas_auto_anio = data.get("citas_autocitas_por_anio", pd.DataFrame())
     top_pubs        = data.get("top_publicaciones",        pd.DataFrame())
+    citas_dept      = data.get("citas_por_departamento",   pd.DataFrame())
 
     return html.Div([
         html.Div([
@@ -77,7 +72,7 @@ def layout_impacto(data: dict) -> html.Div:
             # Scatter impacto + citas por departamento
             dbc.Row([
                 dbc.Col(_card_scatter_impacto(comparativa), md=7),
-                dbc.Col(_card_citas_dept(comparativa), md=5),
+                dbc.Col(_card_citas_dept(citas_dept), md=5),
             ], className="g-3 mb-3"),
 
             # Evolución de citas (ancho completo).
@@ -245,8 +240,8 @@ def _card_mayor_impacto_cita_promedio(df: pd.DataFrame) -> dbc.Card:
             elif col == "h_index":
                 cells.append(html.Td(f"{int(val)}" if pd.notna(val) else "—", style=style))
             elif col == "departamento":
-                cells.append(html.Td(str(val)[:20] + ("…" if len(str(val)) > 20 else "")
-                                     if pd.notna(val) else "—", style={"color": _MUTED}))
+                cells.append(html.Td(abreviar_area(val) if pd.notna(val) else "—",
+                                     style={"color": _MUTED}))
             else:
                 cells.append(html.Td(str(val)[:35] if pd.notna(val) else "—", style=style))
         rows.append(html.Tr(cells))
@@ -284,7 +279,7 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
         work,
         x="publicaciones_total", y="citas_totales",
         size="h_index", color="departamento",
-        color_discrete_map=COLORES_DEPT,
+        color_discrete_map=discrete_map(work["departamento"]),
         text="nombre_normalizado",
         labels={"publicaciones_total": "Publicaciones", "citas_totales": "Citas",
                 "departamento": "Área de investigación", "h_index": "h-index"},
@@ -313,7 +308,8 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
     return dbc.Card([
         _pretty_header(
             "Producción vs Impacto por profesor",
-            "Tamaño = h-index · líneas punteadas = medianas del conjunto",
+            "Citas = suma de citas de las publicaciones del profesor en el período filtrado · "
+            "tamaño = h-index Scopus (histórico) · líneas punteadas = medianas",
         ),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
@@ -324,28 +320,36 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
 # ---------------------------------------------------------------------------
 
 def _card_citas_dept(df: pd.DataFrame) -> dbc.Card:
+    """Citas por área contando cada publicación una sola vez.
+
+    Recibe ``citas_por_departamento`` (publicaciones únicas por área desde la
+    capa de datos).  NO debe reconstruirse sumando la comparativa por
+    profesor: una publicación con k profesores del área se contaría k veces
+    (doble conteo de co-autorías internas, +19–22 % medido).
+    """
     if df.empty or "citas_totales" not in df.columns:
         return _card_vacia("Citas por área de investigación", "Sin datos comparativos.")
 
-    plot_df = (
-        df.groupby("departamento", as_index=False)["citas_totales"]
-        .sum().sort_values("citas_totales")
-    )
+    plot_df = df.sort_values("citas_totales").copy()
     fig = go.Figure(go.Bar(
         x=plot_df["citas_totales"],
-        y=plot_df["departamento"].apply(
-            lambda d: d.split()[-1][:12] if len(d.split()) >= 1 else d[:12]
-        ),
+        y=[wrap_area(d) for d in plot_df["departamento"]],
         orientation="h",
-        marker_color=[COLORES_DEPT.get(d, _SECONDARY) for d in plot_df["departamento"]],
+        marker_color=[color_area(d) for d in plot_df["departamento"]],
         marker_line_color="white", marker_line_width=1.5,
-        hovertemplate="<b>%{y}</b><br>Citas: %{x:,}<extra></extra>",
+        customdata=plot_df[["departamento", "publicaciones"]].values,
+        hovertemplate=("<b>%{customdata[0]}</b><br>Citas: %{x:,}<br>"
+                       "Publicaciones: %{customdata[1]:,}<extra></extra>"),
     ))
-    _apply_layout(fig, height=260)
+    _apply_layout(fig, height=280)
     fig.update_layout(showlegend=False)
+    fig.update_yaxes(automargin=True)
 
     return dbc.Card([
-        _pretty_header("Citas acumuladas por área de investigación", "Impacto total comparado"),
+        _pretty_header(
+            "Citas acumuladas por área de investigación",
+            "Cada publicación cuenta una sola vez por área (co-autorías internas no se duplican)",
+        ),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
 
@@ -360,7 +364,7 @@ def _card_evolucion_citas(df: pd.DataFrame) -> dbc.Card:
 
     fig = px.line(
         df, x="anio", y="citas_totales", color="departamento",
-        markers=True, color_discrete_map=COLORES_DEPT,
+        markers=True, color_discrete_map=discrete_map(df["departamento"]),
         labels={"anio": "Año", "citas_totales": "Citas", "departamento": "Área de investigación"},
     )
     fig.update_traces(line=dict(width=3), marker=dict(size=8))

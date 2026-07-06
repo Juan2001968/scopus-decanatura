@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict
-
 import dash_bootstrap_components as dbc
 import numpy as np
 import pandas as pd
@@ -9,6 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import dcc, html
 
+from dashboard.area_style import abreviar_area, color_area, pill_area
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -25,23 +24,11 @@ _MUTED     = "#64748b"
 _GRID      = "#e2e8f0"
 _PAPER     = "#ffffff"
 
-COLORES_DEPT: Dict[str, str] = {
-    "Departamento de Matemáticas y Estadística": _PRIMARY,
-    "Departamento de Química y Biología":        _SECONDARY,
-    "Departamento de Física y Geociencias":      _WARNING,
-}
-
 PALETA = [_PRIMARY, _SECONDARY, _WARNING, _SUCCESS, "#7c3aed", _DANGER]
-
-_DEPT_SHORT = {
-    "Departamento de Matemáticas y Estadística": "Mat. & Est.",
-    "Departamento de Química y Biología":        "Quím. & Bio.",
-    "Departamento de Física y Geociencias":      "Fís. & Geo.",
-}
 
 
 def _short_dept(name: str) -> str:
-    return _DEPT_SHORT.get(name, name)
+    return abreviar_area(name)
 
 
 def _apply_layout(fig, height: int = 380):
@@ -111,11 +98,6 @@ def _card_ranking_profesores(df: pd.DataFrame) -> dbc.Card:
     work["pos"] = range(1, len(work) + 1)
 
     _MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
-    _PILL_DEPT = {
-        "Departamento de Matemáticas y Estadística": ("Mat.", "#1a3a5c", "#e8f0fb"),
-        "Departamento de Química y Biología":        ("Q&B",  "#2563a8", "#dbeafe"),
-        "Departamento de Física y Geociencias":      ("Fís.", "#b45309", "#fef3c7"),
-    }
 
     header = html.Thead(html.Tr([
         html.Th("#"),
@@ -132,8 +114,7 @@ def _card_ranking_profesores(df: pd.DataFrame) -> dbc.Card:
         pos   = int(row["pos"])
         medal = _MEDALS.get(pos, "")
         dept  = str(row.get("departamento", ""))
-        pill_info = _PILL_DEPT.get(dept, (dept[:4], "#64748b", "#f1f5f9"))
-        pill_label, pill_color, pill_bg = pill_info
+        pill_label, pill_color, pill_bg = pill_area(dept)
 
         h_val   = row.get("h_index")
         q_val   = row.get("pct_q1q2")
@@ -206,8 +187,11 @@ def _card_top10_profesores(df: pd.DataFrame) -> dbc.Card:
     dept_col   = "departamento"       if "departamento"       in work.columns else None
 
     fig = go.Figure()
-    for dept, color in COLORES_DEPT.items():
-        sub = work[work[dept_col] == dept] if dept_col else pd.DataFrame()
+    deptos_presentes = (
+        [d for d in work[dept_col].dropna().unique()] if dept_col else []
+    )
+    for dept in deptos_presentes:
+        sub = work[work[dept_col] == dept]
         if sub.empty:
             continue
         fig.add_trace(go.Bar(
@@ -215,23 +199,10 @@ def _card_top10_profesores(df: pd.DataFrame) -> dbc.Card:
             y=sub[nombre_col].str[:28],
             orientation="h",
             name=_short_dept(dept),
-            marker_color=color,
+            marker_color=color_area(dept),
             marker_line_color="white", marker_line_width=1.5,
             hovertemplate="<b>%{y}</b><br>Publicaciones: %{x}<extra></extra>",
         ))
-
-    # Profesores sin departamento conocido
-    if dept_col:
-        sin_dept = work[~work[dept_col].isin(COLORES_DEPT)]
-        if not sin_dept.empty:
-            fig.add_trace(go.Bar(
-                x=sin_dept["publicaciones_total"],
-                y=sin_dept[nombre_col].str[:28],
-                orientation="h",
-                name="Otro",
-                marker_color="#94a3b8",
-                hovertemplate="<b>%{y}</b><br>Publicaciones: %{x}<extra></extra>",
-            ))
 
     _apply_layout(fig, height=360)
     fig.update_layout(barmode="stack", showlegend=True)
@@ -262,7 +233,7 @@ def _card_evolucion_toggle(df: pd.DataFrame) -> dbc.Card:
 
     for i, depto in enumerate(deptos):
         sub = df[df["nombre_departamento"] == depto].sort_values("anio")
-        color = COLORES_DEPT.get(depto, PALETA[i % len(PALETA)])
+        color = color_area(depto, PALETA[i % len(PALETA)])
         fig.add_trace(go.Bar(
             x=sub["anio"], y=sub["publicaciones"],
             name=_short_dept(depto),
@@ -273,7 +244,7 @@ def _card_evolucion_toggle(df: pd.DataFrame) -> dbc.Card:
 
     for i, depto in enumerate(deptos):
         sub = df[df["nombre_departamento"] == depto].sort_values("anio")
-        color = COLORES_DEPT.get(depto, PALETA[i % len(PALETA)])
+        color = color_area(depto, PALETA[i % len(PALETA)])
         fig.add_trace(go.Scatter(
             x=sub["anio"], y=sub["publicaciones"].cumsum(),
             name=_short_dept(depto),

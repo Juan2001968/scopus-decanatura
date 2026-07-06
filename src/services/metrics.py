@@ -585,6 +585,59 @@ def calcular_estadisticas_colaboracion(
     }
 
 
+def calcular_coautoria_pares(links: pd.DataFrame) -> pd.DataFrame:
+    """Pares de co-autoría a partir de vínculos publicación-profesor.
+
+    Recibe los vínculos **ya filtrados** por la capa de presentación
+    (publicaciones del período/tipo/cuartil activo y, si aplica,
+    profesores del área seleccionada) y cuenta, para cada par de
+    profesores, en cuántas publicaciones coinciden.
+
+    Parameters
+    ----------
+    links:
+        DataFrame con columnas ``id_publicacion`` e ``id_profesor``
+        (una fila por vínculo).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columnas: ``id_prof_a``, ``id_prof_b``, ``n_copubs``, con
+        ``id_prof_a < id_prof_b`` (pares no dirigidos, sin duplicados).
+        Ordenado por ``n_copubs`` descendente.
+    """
+    cols = ["id_prof_a", "id_prof_b", "n_copubs"]
+
+    if links is None or links.empty:
+        return pd.DataFrame(columns=cols)
+
+    work = (
+        links[["id_publicacion", "id_profesor"]]
+        .dropna()
+        .drop_duplicates()
+    )
+
+    pares = work.merge(work, on="id_publicacion", suffixes=("_a", "_b"))
+    pares = pares[pares["id_profesor_a"] < pares["id_profesor_b"]]
+    if pares.empty:
+        return pd.DataFrame(columns=cols)
+
+    resultado = (
+        pares.groupby(["id_profesor_a", "id_profesor_b"])["id_publicacion"]
+        .nunique()
+        .reset_index(name="n_copubs")
+        .rename(columns={"id_profesor_a": "id_prof_a", "id_profesor_b": "id_prof_b"})
+        .sort_values("n_copubs", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    logger.debug(
+        "calcular_coautoria_pares: %d pares desde %d vinculos",
+        len(resultado), len(work),
+    )
+    return resultado
+
+
 # ---------------------------------------------------------------------------
 # Keywords
 # ---------------------------------------------------------------------------

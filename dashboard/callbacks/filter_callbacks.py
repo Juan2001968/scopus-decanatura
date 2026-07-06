@@ -546,6 +546,32 @@ def _build_top_publicaciones(df: pd.DataFrame, top_n: int = 25) -> pd.DataFrame:
     return work[cols].reset_index(drop=True)
 
 
+def _build_citas_por_departamento(contexts: list[dict]) -> pd.DataFrame:
+    """Citas por área contando cada publicación UNA sola vez.
+
+    Los DataFrames de ``contexts`` provienen de ``get_publicaciones`` con
+    filtro de departamento (EXISTS ⇒ publicaciones únicas), por lo que la
+    suma de ``cited_by_count`` no repite co-autorías internas.  Es la misma
+    base que usan los KPIs y la tabla de Visión General.
+
+    Nota: sumar en su lugar las citas de la comparativa por profesor
+    inflaría el total (+19–22 % medido), porque una publicación con k
+    profesores del área aparece k veces.
+    """
+    cols = ["departamento", "publicaciones", "citas_totales"]
+    rows: list[dict] = []
+    for ctx in contexts:
+        df = ctx["df"]
+        rows.append({
+            "departamento":  ctx["departamento"],
+            "publicaciones": int(df["id_publicacion"].nunique()) if not df.empty else 0,
+            "citas_totales": int(df["cited_by_count"].fillna(0).sum()) if not df.empty else 0,
+        })
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows, columns=cols)
+
+
 def _build_impacto_data(
     departamento_id: Optional[int],
     profesor_id: Optional[int],
@@ -562,6 +588,7 @@ def _build_impacto_data(
         "top_publicaciones":        _build_top_publicaciones(base_df, top_n=25),
         "comparativa_profesores":   _build_profesor_comparativa(departamento_id, profesor_id, anios, tipos, cuartiles),
         "evolucion_comparativa":    _build_evolucion_comparativa(contexts),
+        "citas_por_departamento":   _build_citas_por_departamento(contexts),
     }
 
 
@@ -670,6 +697,57 @@ def _build_idiomas_df(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _build_red_coautoria(
+    base_df: pd.DataFrame,
+    departamento_id: Optional[int],
+    profesor_id: Optional[int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Aristas y nodos de la red de co-autoría, coherentes con los filtros.
+
+    La red se construye desde ``base_df`` (las publicaciones que ya pasaron
+    por los filtros de área/profesor/período/tipo/cuartil), de modo que el
+    grafo reacciona a TODOS los filtros igual que el resto de indicadores.
+    Antes se usaba ``get_coautoria_entre_profesores`` sin período/tipo/
+    cuartil y con un filtro de área asimétrico (solo el miembro de menor
+    id), por lo que el grafo apenas cambiaba al filtrar.
+
+    Reglas:
+    - Área seleccionada: solo pares con AMBOS profesores del área
+      (los nodos del grafo son los profesores del área).
+    - Profesor seleccionado: red ego — el profesor y sus co-autores de la
+      División en las publicaciones filtradas.
+    """
+    vacio = pd.DataFrame(columns=["id_prof_a", "id_prof_b", "n_copubs"])
+
+    links = queries.get_publicacion_profesor_links()
+    if _df_error(links) or links.empty or base_df.empty:
+        profesores = queries.get_profesores(departamento_id=departamento_id, solo_activos=False)
+        return vacio, profesores
+
+    ids_filtrados = set(base_df["id_publicacion"].dropna())
+    links = links[links["id_publicacion"].isin(ids_filtrados)]
+    if departamento_id is not None:
+        links = links[links["id_departamento"] == departamento_id]
+
+    coautoria = metrics.calcular_coautoria_pares(links)
+
+    if profesor_id is not None:
+        coautoria = coautoria[
+            (coautoria["id_prof_a"] == profesor_id)
+            | (coautoria["id_prof_b"] == profesor_id)
+        ].reset_index(drop=True)
+
+    profesores = queries.get_profesores(departamento_id=departamento_id, solo_activos=False)
+    if profesor_id is not None and not profesores.empty:
+        # Red ego: mostrar solo el profesor y sus co-autores.
+        participantes = (
+            set(coautoria["id_prof_a"]) | set(coautoria["id_prof_b"]) | {profesor_id}
+        )
+        profesores = profesores[profesores["id_profesor"].isin(participantes)]
+
+    return coautoria, profesores
+
+
 def _build_colaboracion_data(
     departamento_id: Optional[int],
     profesor_id: Optional[int],
@@ -681,8 +759,7 @@ def _build_colaboracion_data(
     hist    = _build_histograma_autores(base_df)
 
     try:
-        coautoria  = queries.get_coautoria_entre_profesores(departamento_id=departamento_id)
-        profesores = queries.get_profesores(departamento_id=departamento_id, solo_activos=False)
+        coautoria, profesores = _build_red_coautoria(base_df, departamento_id, profesor_id)
     except Exception as exc:
         logger.error("Error construyendo red coautoría: %s", exc)
         coautoria  = pd.DataFrame()
@@ -696,6 +773,9 @@ def _build_colaboracion_data(
         "idiomas":         _build_idiomas_df(base_df),
         "coautoria_red":   coautoria,
         "profesores_red":  profesores,
+        "filtros_descripcion": _filtros_activos_descripcion(
+            departamento_id, profesor_id, anios, tipos, cuartiles,
+        ),
         # TODO: "publicaciones_interinstitucionales": queries.get_publicaciones_interinstitucionales(...)
     }
 
@@ -707,11 +787,47 @@ def _build_benchmarking_data(
     tipos: list[str],
     cuartiles: Optional[list[str]] = None,
 ) -> dict:
-    comparativa = _build_profesor_comparativa(departamento_id, profesor_id, anios, tipos, cuartiles)
-    contexts    = _get_department_contexts(departamento_id, profesor_id, anios, tipos, cuartiles)
+    """Ranking de profesores + radar comparativo de las tres áreas.
 
-    anio_max     = _safe_year_range(anios)[1]
-    anio_rec_min = anio_max - 2
+    Radar — definiciones de las 5 dimensiones (valores crudos):
+
+    - **Volumen**: número de publicaciones únicas del área en el período
+      filtrado.
+    - **Impacto**: citas por publicación (``suma de cited_by_count /
+      publicaciones``) en el período filtrado.  Se usa el promedio y no el
+      total para no volver a premiar el tamaño del área (eso ya lo mide
+      Volumen).
+    - **Calidad**: proporción de publicaciones en revistas Q1 o Q2 (SJR del
+      año de publicación) sobre el total del área, incluyendo las que no
+      tienen cuartil ("Sin dato").
+    - **h-index**: promedio del h-index Scopus de los profesores del área.
+      Es una foto del perfil del autor: NO reacciona a los filtros de
+      período/tipo/cuartil.
+    - **Tendencia**: publicaciones del último trienio [hasta-2, hasta]
+      dividido por las del trienio anterior [hasta-5, hasta-3].
+      1.0 = producción estable; >1 crecimiento; <1 decrecimiento.
+      Si el trienio anterior es 0, se usa 1 como denominador.
+
+    Normalización: cada dimensión se divide por el MÁXIMO entre las tres
+    áreas, quedando en [0, 1].  Por construcción, el área líder de cada
+    dimensión marca exactamente 1.0 — que un área salga en 1 en varios ejes
+    significa que lidera esas dimensiones, no que haya un error.  Se eligió
+    esta normalización (y no que las áreas sumen 1 por eje) porque conserva
+    los cocientes entre áreas, no depende del número de áreas y hace legible
+    el radar: 1 = mejor área del eje.
+
+    El radar SIEMPRE compara las tres áreas de la División (aplicando los
+    filtros de período/tipo/cuartil).  Antes se calculaba solo sobre el área
+    o profesor seleccionado, y con un único polígono la normalización por
+    máximo lo dejaba todo en 1.0 (caso degenerado sin información).
+    """
+    comparativa = _build_profesor_comparativa(departamento_id, profesor_id, anios, tipos, cuartiles)
+    # Contextos de TODAS las áreas para el radar (ignora área/profesor
+    # seleccionados; el radar es comparativo por naturaleza).
+    contexts = _get_department_contexts(None, None, anios, tipos, cuartiles)
+
+    anio_max      = _safe_year_range(anios)[1]
+    anio_rec_min  = anio_max - 2
     anio_prev_min = anio_rec_min - 3
     anio_prev_max = anio_rec_min - 1
 
@@ -720,8 +836,9 @@ def _build_benchmarking_data(
 
     for ctx in contexts:
         df  = ctx["df"]
-        vol = metrics.contar_publicaciones(df) if not df.empty else 0
-        imp = int(df["cited_by_count"].fillna(0).sum()) if not df.empty else 0
+        vol = int(df["id_publicacion"].nunique()) if not df.empty else 0
+        citas = int(df["cited_by_count"].fillna(0).sum()) if not df.empty else 0
+        imp = citas / vol if vol > 0 else 0.0  # citas por publicación
 
         if not df.empty and "cuartil_sjr" in df.columns:
             tot = len(df)
@@ -740,7 +857,7 @@ def _build_benchmarking_data(
         if not df.empty and "anio_publicacion" in df.columns:
             rec  = len(df[df["anio_publicacion"] >= anio_rec_min])
             prev = len(df[df["anio_publicacion"].between(anio_prev_min, anio_prev_max)])
-            tend = rec / (prev + 1)
+            tend = rec / max(prev, 1)
         else:
             tend = 0.0
 
@@ -752,7 +869,7 @@ def _build_benchmarking_data(
         for col in dimensiones:
             mx = arr[col].max()
             arr[col] = arr[col] / mx if mx > 0 else 0.0
-        dept_vals = arr.values.tolist()
+        dept_vals = arr.round(4).values.tolist()
     else:
         dept_vals = []
 
@@ -760,6 +877,7 @@ def _build_benchmarking_data(
         "departamentos": dept_names,
         "dimensiones":   dimensiones,
         "valores":       dept_vals,
+        "crudos":        raw_vals,
     }
 
     return {"ranking": comparativa, "radar": radar}
