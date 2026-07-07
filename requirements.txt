@@ -1,3 +1,5 @@
+# Dependencias de RUNTIME del dashboard (lo que instala Render).
+# Las herramientas de ETL/desarrollo viven en requirements-dev.txt.
 dash==2.18.2
 dash-bootstrap-components==1.6.0
 plotly==5.24.1
@@ -7,9 +9,4 @@ sqlalchemy==2.0.36
 psycopg2-binary==2.9.10
 python-dotenv==1.0.1
 requests==2.32.3
-pybliometrics==3.5.2
-fuzzywuzzy==0.18.0
-openpyxl==3.1.5
-jupyter==1.1.1
-pytest==8.3.3
 gunicorn==23.0.0
