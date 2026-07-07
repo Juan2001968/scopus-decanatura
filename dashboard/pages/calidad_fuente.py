@@ -89,63 +89,87 @@ def layout_fuentes(data: dict) -> html.Div:
 # ---------------------------------------------------------------------------
 
 def _card_bubble_revistas(df: pd.DataFrame) -> dbc.Card:
-    if df.empty or "sjr" not in df.columns or "citescore" not in df.columns:
+    if df.empty or ("sjr" not in df.columns and "citescore" not in df.columns):
         return _card_vacia("Bubble chart de revistas",
                            "Sin métricas SJR/CiteScore para construir el gráfico.")
 
-    work = df.dropna(subset=["sjr", "citescore"]).copy()
+    work = df.copy()
+    for col in ("sjr", "citescore"):
+        if col not in work.columns:
+            work[col] = None
+        work[col] = pd.to_numeric(work[col], errors="coerce")
+
+    # Conservar revistas con AL MENOS una métrica.  Antes se exigían SJR y
+    # CiteScore a la vez y el gráfico quedaba siempre vacío: la tabla
+    # fuente_metrica solo trae SJR (CiteScore no está cargado en la BD).
+    work = work.dropna(subset=["sjr", "citescore"], how="all")
     if work.empty:
         return _card_vacia("Bubble chart de revistas",
-                           "Sin datos de SJR y CiteScore simultáneamente.")
+                           "Ninguna revista del filtro activo tiene métricas SJR ni CiteScore.")
 
-    for col in ("sjr", "citescore"):
-        work[col] = pd.to_numeric(work[col], errors="coerce")
     work["count"] = pd.to_numeric(work.get("count", 1), errors="coerce").fillna(1)
-    work = work.dropna(subset=["sjr", "citescore"])
 
     if "cuartil_sjr" not in work.columns:
         work["cuartil_sjr"] = "Sin dato"
     work["cuartil_sjr"] = work["cuartil_sjr"].fillna("Sin dato")
-
-    med_sjr = work["sjr"].median()
-    med_cs  = work["citescore"].median()
 
     if "source_title" in work.columns:
         work["label"] = work["source_title"].str[:45]
     else:
         work["label"] = "Revista"
 
+    # Ejes: SJR vs CiteScore cuando hay suficientes revistas con ambas
+    # métricas; si una de las dos falta (el caso real de la BD), degradar a
+    # la métrica disponible en X y las citas totales de la revista en Y.
+    ambas = work.dropna(subset=["sjr", "citescore"])
+    if len(ambas) >= 3:
+        plot_df, x_col, y_col = ambas, "sjr", "citescore"
+        x_lab, y_lab, y_hover = "SJR", "CiteScore", ":.2f"
+        subtitle = "Tamaño = artículos publicados · color = cuartil SJR · líneas = medianas"
+    else:
+        x_col = ("sjr" if work["sjr"].notna().sum() >= work["citescore"].notna().sum()
+                 else "citescore")
+        x_lab = "SJR" if x_col == "sjr" else "CiteScore"
+        faltante = "CiteScore" if x_col == "sjr" else "SJR"
+        y_col = "citas" if "citas" in work.columns else "count"
+        y_lab = "Citas totales" if y_col == "citas" else "Artículos"
+        y_hover = ":,.0f"
+        plot_df = work.dropna(subset=[x_col]).copy()
+        plot_df[y_col] = pd.to_numeric(plot_df[y_col], errors="coerce").fillna(0)
+        subtitle = (f"Sin datos de {faltante} en la BD — se muestra {x_lab} vs "
+                    f"{y_lab.lower()} · tamaño = artículos · color = cuartil SJR")
+
+    med_x = plot_df[x_col].median()
+    med_y = plot_df[y_col].median()
+
     fig = px.scatter(
-        work, x="sjr", y="citescore",
+        plot_df, x=x_col, y=y_col,
         size="count", color="cuartil_sjr",
         color_discrete_map=_COLORES_CUARTIL,
         hover_name="label", size_max=40,
-        labels={"sjr": "SJR", "citescore": "CiteScore", "count": "Artículos"},
-        custom_data=["source_title" if "source_title" in work.columns else "label",
-                     "count", "sjr", "citescore"],
+        labels={x_col: x_lab, y_col: y_lab, "count": "Artículos"},
+        custom_data=["source_title" if "source_title" in plot_df.columns else "label",
+                     "count", x_col, y_col],
     )
     fig.update_traces(
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Artículos: %{customdata[1]}<br>"
-            "SJR: %{customdata[2]:.3f}<br>"
-            "CiteScore: %{customdata[3]:.2f}<extra></extra>"
+            f"{x_lab}: %{{customdata[2]:.3f}}<br>"
+            f"{y_lab}: %{{customdata[3]{y_hover}}}<extra></extra>"
         ),
         marker=dict(line=dict(width=1.5, color="white"), opacity=0.85),
     )
-    fig.add_vline(x=med_sjr, line_dash="dot", line_color="#94a3b8", line_width=1.5,
-                  annotation_text=f"Med. SJR: {med_sjr:.2f}",
+    fig.add_vline(x=med_x, line_dash="dot", line_color="#94a3b8", line_width=1.5,
+                  annotation_text=f"Med. {x_lab}: {med_x:.2f}",
                   annotation_font_size=10, annotation_font_color=_MUTED)
-    fig.add_hline(y=med_cs, line_dash="dot", line_color="#94a3b8", line_width=1.5,
-                  annotation_text=f"Med. CS: {med_cs:.2f}",
+    fig.add_hline(y=med_y, line_dash="dot", line_color="#94a3b8", line_width=1.5,
+                  annotation_text=f"Med. {y_lab}: {med_y:,.1f}",
                   annotation_font_size=10, annotation_font_color=_MUTED)
     _apply_layout(fig, height=420)
 
     return dbc.Card([
-        _pretty_header(
-            "Bubble chart de revistas: SJR vs CiteScore",
-            "Tamaño = artículos publicados · color = cuartil SJR · líneas = medianas",
-        ),
+        _pretty_header(f"Bubble chart de revistas: {x_lab} vs {y_lab}", subtitle),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card")
 
@@ -279,46 +303,57 @@ def _card_tabla_fuentes(df: pd.DataFrame) -> dbc.Card:
 # ---------------------------------------------------------------------------
 
 def _card_sin_clasificar(df: pd.DataFrame) -> dbc.Card:
+    n = 0 if df is None else len(df)
+    toolbar = html.Div([
+        html.Div([
+            html.H5("Publicaciones sin clasificar / Sin métricas", className="table-toolbar-title"),
+            html.P("Artículos en revistas sin SJR, sin ISSN o no indexadas en Scimago "
+                   "(respeta los filtros activos).",
+                   className="table-toolbar-subtitle"),
+        ]),
+        html.Span(f"{n} publicaciones", className="table-pill"),
+    ], className="table-toolbar")
+
     if df is None or df.empty:
-        # TODO: query publicaciones_sin_clasificar — filtrar por cuartil_sjr IS NULL o SJR IS NULL
         return dbc.Card([
-            html.Div([
-                html.Div([
-                    html.H5("Publicaciones sin clasificar / Sin métricas", className="table-toolbar-title"),
-                    html.P("Artículos en revistas sin SJR, sin ISSN o no indexadas en Scimago.",
-                           className="table-toolbar-subtitle"),
-                ]),
-            ], className="table-toolbar"),
+            toolbar,
             dbc.CardBody(html.Div([
-                html.Div("Tabla pendiente de implementación", className="empty-state-title"),
+                html.Div("Sin publicaciones pendientes de clasificar",
+                         className="empty-state-title"),
                 html.P(
-                    "Requiere query de publicaciones con cuartil_sjr IS NULL o sjr IS NULL. "
-                    "Ver: TODO en filter_callbacks._build_fuentes_data()",
+                    "Todas las publicaciones de la combinación de filtros actual "
+                    "tienen SJR y cuartil asignados.",
                     className="empty-state-text",
                 ),
             ], className="empty-state")),
         ], className="pretty-card table-card")
 
     col_map = {
-        "titulo":      "Título",
-        "profesor":    "Profesor",
+        "titulo":           "Título",
+        "profesor":         "Profesor",
+        "source_title":     "Revista",
         "anio_publicacion": "Año",
-        "source_title":"Revista",
-        "razon":       "Razón",
+        "issn":             "ISSN",
+        "razon":            "Razón",
     }
     cols_ok = [c for c in col_map if c in df.columns]
     header  = html.Thead(html.Tr([html.Th(col_map[c]) for c in cols_ok]))
-    rows = [
-        html.Tr([html.Td(str(row.get(c, "—"))[:60]) for c in cols_ok])
-        for _, row in df.iterrows()
-    ]
+
+    rows = []
+    for _, row in df.iterrows():
+        cells = []
+        for c in cols_ok:
+            val = row.get(c)
+            if pd.isna(val) or str(val).strip() == "":
+                cells.append(html.Td("—"))
+            elif c == "anio_publicacion":
+                cells.append(html.Td(f"{int(val)}", style={"whiteSpace": "nowrap"}))
+            else:
+                cells.append(html.Td(str(val)[:70]))
+        rows.append(html.Tr(cells))
 
     return dbc.Card([
-        html.Div([
-            html.H5("Publicaciones sin clasificar / Sin métricas", className="table-toolbar-title"),
-            html.P("Artículos que pueden mejorar su visibilidad con indexación adecuada.",
-                   className="table-toolbar-subtitle"),
-        ], className="table-toolbar"),
+        toolbar,
         dbc.Table([header, html.Tbody(rows)],
                   bordered=False, hover=True, size="sm",
                   responsive=True, className="mb-0 align-middle"),

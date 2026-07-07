@@ -285,7 +285,7 @@ def _get_department_contexts(
 
 
 def _build_top_fuentes_df(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
-    cols = ["source_title", "count", "proporcion", "issn", "sjr", "citescore", "snip", "cuartil_sjr"]
+    cols = ["source_title", "count", "citas", "proporcion", "issn", "sjr", "citescore", "snip", "cuartil_sjr"]
     if df.empty or "source_title" not in df.columns:
         return pd.DataFrame(columns=cols)
 
@@ -296,6 +296,7 @@ def _build_top_fuentes_df(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
         work.groupby(["source_title", "issn"], dropna=False)
         .agg(
             count=("id_publicacion", "nunique"),
+            citas=("cited_by_count", "sum"),
             sjr=("sjr", "mean"),
             citescore=("citescore", "mean"),
             snip=("snip", "mean"),
@@ -322,6 +323,9 @@ def _build_top_fuentes_df(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
     for col in ["sjr", "citescore", "snip"]:
         if col in grouped.columns:
             grouped[col] = pd.to_numeric(grouped[col], errors="coerce").round(3)
+    grouped["citas"] = (
+        pd.to_numeric(grouped["citas"], errors="coerce").fillna(0).astype(int)
+    )
 
     return grouped[cols].reset_index(drop=True)
 
@@ -612,6 +616,72 @@ def _build_sjr_por_departamento(contexts: list[dict]) -> pd.DataFrame:
     )
 
 
+def _build_publicaciones_sin_clasificar(base_df: pd.DataFrame) -> pd.DataFrame:
+    """Publicaciones sin métricas de fuente: ``cuartil_sjr`` o ``sjr`` nulos.
+
+    Opera sobre el DataFrame ya filtrado (área/profesor/período/tipo), por lo
+    que la tabla respeta los mismos filtros que el resto de la vista.  La
+    columna ``razon`` explica qué falta: revista sin ISSN, no indexada en
+    Scimago (sin SJR ni cuartil) o con métrica parcial.
+    """
+    cols = ["titulo", "profesor", "anio_publicacion", "source_title", "issn", "razon"]
+    if base_df.empty:
+        return pd.DataFrame(columns=cols)
+
+    work = base_df.copy()
+    for col in ("sjr", "cuartil_sjr", "issn", "source_title", "titulo"):
+        if col not in work.columns:
+            work[col] = None
+
+    work = work[work["sjr"].isna() | work["cuartil_sjr"].isna()].copy()
+    if work.empty:
+        return pd.DataFrame(columns=cols)
+
+    def _razon(row: pd.Series) -> str:
+        if pd.isna(row["source_title"]) or not str(row["source_title"]).strip():
+            return "Sin revista asociada"
+        if pd.isna(row["issn"]) or not str(row["issn"]).strip():
+            return "Revista sin ISSN"
+        if pd.isna(row["sjr"]) and pd.isna(row["cuartil_sjr"]):
+            return "Sin métricas Scimago para el año"
+        if pd.isna(row["cuartil_sjr"]):
+            return "Con SJR pero sin cuartil"
+        return "Con cuartil pero sin SJR"
+
+    work["razon"] = work.apply(_razon, axis=1)
+
+    # Nombre(s) del profesor vinculado a cada publicación.  Si el filtro es
+    # por profesor, la query ya trae ``nombre_normalizado``; en el resto de
+    # casos se resuelve con la tabla de vínculos publicación-profesor.
+    if "nombre_normalizado" in work.columns:
+        work["profesor"] = work["nombre_normalizado"].fillna("—")
+    else:
+        links = queries.get_publicacion_profesor_links()
+        profes = queries.get_profesores(solo_activos=False)
+        if (
+            not _df_error(links) and not links.empty
+            and not _df_error(profes) and not profes.empty
+        ):
+            nombres = profes.set_index("id_profesor")["nombre_normalizado"]
+            links = links[links["id_publicacion"].isin(work["id_publicacion"])].copy()
+            links["profesor"] = links["id_profesor"].map(nombres)
+            por_pub = (
+                links.dropna(subset=["profesor"])
+                .groupby("id_publicacion")["profesor"]
+                .agg(lambda s: ", ".join(sorted(set(s))))
+            )
+            work["profesor"] = work["id_publicacion"].map(por_pub).fillna("—")
+        else:
+            work["profesor"] = "—"
+
+    work = (
+        work.drop_duplicates(subset=["id_publicacion"])
+        .sort_values("anio_publicacion", ascending=False)
+        .reset_index(drop=True)
+    )
+    return work[cols]
+
+
 def _build_fuentes_data(
     departamento_id: Optional[int],
     profesor_id: Optional[int],
@@ -627,7 +697,7 @@ def _build_fuentes_data(
         "cuartiles_por_departamento":  _build_cuartiles_por_departamento(contexts),
         "top_fuentes":                 _build_top_fuentes_df(base_df, top_n=20),
         "sjr_por_departamento":        _build_sjr_por_departamento(contexts),
-        # TODO: "publicaciones_sin_clasificar": queries.get_publicaciones_sin_clasificar(...)
+        "publicaciones_sin_clasificar": _build_publicaciones_sin_clasificar(base_df),
     }
 
 
@@ -928,6 +998,12 @@ def _make_kpi_block(title: str, subtitle: str, kpis: dict) -> html.Div:
     ])
 
 
+# Tarjetas de la fila "Indicadores · {área}": sin "Autocitas" (dato no
+# reproducible post-reparación del matching) ni "Profesores activos" (contaba
+# el roster completo del área, no los profesores con publicaciones).
+_AREA_CARDS = ["publicaciones", "citas", "h_index", "pct_q1q2"]
+
+
 def _make_custom_kpi_block(
     title: str, subtitle: str, kpis: dict, cards: list[str],
 ) -> html.Div:
@@ -1193,10 +1269,11 @@ def update_dashboard_content(
             kpis_upper["h_index_label"] = f"H-index Depto.{suffix}"
             kpis_context = _compute_profesor_kpis(profesor_id, anios_value, tipos, cuartiles)
             kpis_context["h_index_label"] = f"H-index Profesor{suffix}"
-            upper_block = _make_kpi_block(
+            upper_block = _make_custom_kpi_block(
                 f"Indicadores · {dept_name}",
                 "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_upper,
+                cards=_AREA_CARDS,
             )
             context_block = _make_kpi_block(
                 f"Indicadores · {prof_name}",
@@ -1212,10 +1289,11 @@ def update_dashboard_content(
             kpis_dept = _compute_global_kpis(anios_value, tipos, cuartiles, departamento_id=departamento_id)
             kpis_dept["h_index_label"] = f"H-index Depto.{suffix}"
             upper_block = _make_division_summary_blocks(kpis_division, _compute_universidad_kpis())
-            context_block = _make_kpi_block(
+            context_block = _make_custom_kpi_block(
                 f"Indicadores · {dept_name}",
                 "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_dept,
+                cards=_AREA_CARDS,
             )
 
         else:
