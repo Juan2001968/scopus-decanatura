@@ -1,58 +1,40 @@
 """
 Tab: Rankings y Benchmarking.
 
-Ranking de profesores con índice compuesto + radar chart por departamento.
+Ranking de profesores de la División con métrica de orden seleccionable.
 """
 from __future__ import annotations
 
 import json
 
 import dash_bootstrap_components as dbc
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 from dash import dcc, html
 
-from dashboard.area_style import pill_area
+from dashboard.area_style import abreviar_area, pill_area
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-_PRIMARY   = "#003865"
-_SECONDARY = "#0066B3"
-_ACCENT    = "#F5A800"
-_SUCCESS   = "#10B981"
-_FONT      = "'DM Sans', 'Segoe UI', Arial, sans-serif"
-_TEXT      = "#1A1A2E"
-_GRID      = "#F3F4F6"
-_PAPER     = "#FFFFFF"
-
-PALETA = [_PRIMARY, _SECONDARY, _ACCENT, _SUCCESS, "#8B5CF6", "#EF4444"]
-
-_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
 def layout_benchmarking(data: dict) -> html.Div:
     logger.info("Renderizando layout_benchmarking")
 
     ranking = data.get("ranking", pd.DataFrame())
-    radar   = data.get("radar", {})
 
     return html.Div([
         html.Div([
             html.H4("Rankings y Benchmarking", className="section-header-title"),
             html.P(
-                "Índice de impacto compuesto por profesor y comparativa multidimensional por área de investigación.",
+                "Ranking de profesores de la División según las métricas de impacto del período filtrado.",
                 className="section-header-subtitle",
             ),
         ], className="section-header-inline"),
 
-        html.Div([
-            dbc.Row([
-                dbc.Col(_card_ranking(ranking), md=7),
-                dbc.Col(_card_radar(radar), md=5),
-            ], className="g-3 mb-3"),
-        ], className="page-section section-stack"),
+        html.Div(
+            _card_ranking(ranking),
+            className="page-section section-stack",
+        ),
     ])
 
 
@@ -82,8 +64,8 @@ def build_ranking_table_body(df: pd.DataFrame, sort_by: str = _DEFAULT_SORT):
     """Construye el cuerpo de la tabla de ranking ordenado por la métrica dada.
 
     ``sort_by`` debe ser una de las columnas reales: ``h_index``,
-    ``citas_totales`` o ``pct_q1q2``. Recalcula posiciones (#, medallas) tras
-    ordenar de mayor a menor. Tolera DataFrames vacíos (datos sin BD).
+    ``citas_totales`` o ``pct_q1q2``. Recalcula posiciones (#) tras ordenar
+    de mayor a menor. Tolera DataFrames vacíos (datos sin BD).
     """
     if not isinstance(df, pd.DataFrame) or df.empty:
         return html.Div([
@@ -98,63 +80,86 @@ def build_ranking_table_body(df: pd.DataFrame, sort_by: str = _DEFAULT_SORT):
     df = df.sort_values(sort_col, ascending=False, na_position="last").reset_index(drop=True)
     df["rank"] = range(1, len(df) + 1)
 
-    # Tendencia: comparar pubs últimas ventana vs anterior
-    if "pubs_recientes" in df.columns and "pubs_anteriores" in df.columns:
-        def _tend(row):
-            r, a = row["pubs_recientes"], row["pubs_anteriores"]
-            if a == 0:
-                return "↑" if r > 0 else "→"
-            d = (r - a) / a
-            if d > 0.1:   return "↑"
-            if d < -0.1:  return "↓"
-            return "→"
-        df["tendencia"] = df.apply(_tend, axis=1)
-    else:
-        df["tendencia"] = "→"
-
-    def _tend_class(t):
-        return {"↑": "trend-up", "↓": "trend-down", "→": "trend-flat"}.get(t, "trend-flat")
-
     header = html.Thead(html.Tr([
-        html.Th("#"),
-        html.Th("Profesor"),
-        html.Th("Dept."),
-        html.Th("h-index"),
-        html.Th("Citas"),
-        html.Th("% Q1+Q2"),
-        html.Th(""),
+        html.Th("#", scope="col", className="col-rank"),
+        html.Th("Profesor", scope="col"),
+        html.Th("h-index", scope="col", className="col-num"),
+        html.Th("Citas", scope="col", className="col-num"),
+        html.Th("% Q1+Q2", scope="col", className="col-num"),
+        html.Th(html.Span("Ver perfil", className="visually-hidden"),
+                scope="col", className="col-action"),
     ]))
 
-    rows = []
-    for _, row in df.iterrows():
-        rank = int(row["rank"])
-        medal = _MEDALS.get(rank, "")
-        dept  = str(row.get("departamento", ""))
-        short_dept = pill_area(dept)[0] if dept else "—"
+    rows = [_ranking_row(row) for _, row in df.iterrows()]
 
-        h_val = row.get("h_index")
-        c_val = row.get("citas_totales")
-        q_val = row.get("pct_q1q2")
-        tend  = row.get("tendencia", "→")
-
-        cells = [
-            html.Td(html.Span(f"{medal} {rank}" if medal else str(rank),
-                              className="rank-number")),
-            html.Td(str(row.get("nombre_normalizado", ""))[:30],
-                    style={"fontWeight": "500"}),
-            html.Td(html.Span(short_dept, style={"fontSize": "11px", "color": "#6B7280"})),
-            html.Td(f"{int(h_val):,}" if pd.notna(h_val) else "—"),
-            html.Td(f"{int(c_val):,}" if pd.notna(c_val) else "—"),
-            html.Td(f"{q_val:.0%}" if pd.notna(q_val) else "—"),
-            html.Td(html.Span(tend, className=_tend_class(tend))),
-        ]
-        rows.append(html.Tr(cells))
-
-    return dbc.Table(
+    table = dbc.Table(
         [header, html.Tbody(rows)],
-        bordered=False, hover=True, striped=False,
-        responsive=True, size="sm", className="mb-0 align-middle",
+        bordered=False, hover=False, striped=False,
+        size="sm", className="ranking-table mb-0",
     )
+    # El div exterior es el contenedor de scroll: fija la altura para el
+    # header sticky y da scroll horizontal en pantallas angostas.
+    return html.Div(table, className="ranking-table-scroll")
+
+
+def _ranking_row(row: pd.Series) -> html.Tr:
+    rank   = int(row["rank"])
+    nombre = str(row.get("nombre_normalizado", "") or "")
+    dept   = str(row.get("departamento", "") or "")
+
+    prof_id = row.get("id_profesor")
+    prof_id = int(prof_id) if pd.notna(prof_id) else None
+
+    h_val = row.get("h_index")
+    c_val = row.get("citas_totales")
+    q_val = row.get("pct_q1q2")
+
+    # Columna Profesor: nombre dominante + área como etiqueta discreta.
+    prof_children: list = [html.Span(nombre, className="prof-name")]
+    if dept:
+        _, area_color, area_bg = pill_area(dept)
+        prof_children.append(html.Span(
+            abreviar_area(dept),
+            className="area-tag",
+            style={"color": area_color, "background": area_bg},
+        ))
+
+    # % Q1+Q2: valor numérico siempre visible + barra fina monocroma
+    # (decorativa: oculta a lectores de pantalla).
+    if pd.notna(q_val):
+        pct = min(max(float(q_val), 0.0), 1.0)
+        q_children = [
+            html.Span(f"{float(q_val):.0%}", className="q-value"),
+            html.Span(
+                html.Span(className="q-bar-fill", style={"width": f"{pct:.0%}"}),
+                className="q-bar",
+                **{"aria-hidden": "true"},
+            ),
+        ]
+    else:
+        q_children = [html.Span("—", className="q-value")]
+
+    # Acción de detalle: navega al perfil del profesor (callback
+    # filter_callbacks._navigate_to_professor, patrón "prof-detail-btn").
+    action = html.Button(
+        "→",
+        id={"type": "prof-detail-btn", "index": prof_id},
+        n_clicks=0,
+        className="row-action",
+        title=f"Ver perfil de {nombre}",
+        **{"aria-label": f"Ver perfil de {nombre}"},
+    ) if prof_id else None
+
+    return html.Tr([
+        html.Td(str(rank), className="cell-rank"),
+        html.Td(html.Div(prof_children, className="prof-cell")),
+        html.Td(f"{int(h_val):,}" if pd.notna(h_val) else "—",
+                className="cell-num cell-hindex"),
+        html.Td(f"{int(c_val):,}" if pd.notna(c_val) else "—",
+                className="cell-num"),
+        html.Td(html.Div(q_children, className="q-cell"), className="cell-num"),
+        html.Td(action, className="cell-action"),
+    ], className="rank-top" if rank <= 3 else None)
 
 
 def _card_ranking(df: pd.DataFrame) -> dbc.Card:
@@ -193,124 +198,3 @@ def _card_ranking(df: pd.DataFrame) -> dbc.Card:
             id="ranking-table-body",
         ),
     ], className="pretty-card table-card")
-
-
-# ---------------------------------------------------------------------------
-# Radar / Spider chart por departamento
-# ---------------------------------------------------------------------------
-
-def _card_radar(radar: dict) -> dbc.Card:
-    """
-    radar = {
-        "departamentos": [...],
-        "dimensiones": ["Volumen","Impacto","Calidad","h-index","Tendencia"],
-        "valores": [[d1_dim1,...,d1_dim5], ...],   # normalizados 0-1 (/ máximo)
-        "crudos":  [[d1_dim1,...,d1_dim5], ...],   # valores sin normalizar
-    }
-
-    Las definiciones y la normalización de cada dimensión están
-    documentadas en ``filter_callbacks._build_benchmarking_data`` y en
-    ``docs/definiciones_indicadores.md``.
-    """
-    deptos = radar.get("departamentos", [])
-    dims   = radar.get("dimensiones", [])
-    vals   = radar.get("valores", [])
-    crudos = radar.get("crudos", [])
-
-    if not deptos or not dims or not vals:
-        return _card_vacia("Radar comparativo", "Sin datos para el radar chart.")
-
-    fig = go.Figure()
-
-    for i, (dept, row_vals) in enumerate(zip(deptos, vals)):
-        color = PALETA[i % len(PALETA)]
-        # Cerrar el polígono repitiendo el primer valor
-        r_closed = list(row_vals) + [row_vals[0]]
-        t_closed = list(dims) + [dims[0]]
-        raw = list(crudos[i]) if i < len(crudos) else [None] * len(row_vals)
-        raw_closed = raw + raw[:1]
-
-        fig.add_trace(go.Scatterpolar(
-            r=r_closed,
-            theta=t_closed,
-            fill="toself",
-            fillcolor=color,
-            line=dict(color=color, width=2.5),
-            opacity=0.25,
-            name=dept,
-            customdata=[[f"{v:,.2f}" if isinstance(v, (int, float)) else "—"]
-                        for v in raw_closed],
-            hovertemplate=("<b>%{theta}</b>: %{r:.2f} "
-                           "(valor real: %{customdata[0]})<extra>" + str(dept) + "</extra>"),
-        ))
-        # Línea sólida sin fill encima
-        fig.add_trace(go.Scatterpolar(
-            r=r_closed, theta=t_closed,
-            mode="lines",
-            line=dict(color=color, width=2.5),
-            showlegend=False,
-            hoverinfo="skip",
-        ))
-
-    fig.update_layout(
-        polar=dict(
-            bgcolor="white",
-            radialaxis=dict(
-                visible=True, range=[0, 1],
-                tickfont=dict(size=9, family=_FONT, color="#9CA3AF"),
-                gridcolor="#E5E7EB", linecolor="#E5E7EB",
-                tickvals=[0, 0.25, 0.5, 0.75, 1],
-                ticktext=["0", "0.25", "0.5", "0.75", "1"],
-            ),
-            angularaxis=dict(
-                tickfont=dict(size=11, family=_FONT, color=_TEXT),
-                gridcolor="#E5E7EB", linecolor="#E5E7EB",
-            ),
-        ),
-        paper_bgcolor=_PAPER,
-        height=420,
-        font=dict(family=_FONT, color=_TEXT, size=12),
-        margin=dict(t=36, b=36, l=48, r=48),
-        legend=dict(
-            orientation="h", yanchor="bottom", y=-0.12,
-            xanchor="center", x=0.5,
-            font=dict(size=11),
-        ),
-        hoverlabel=dict(bgcolor="#1A1A2E", font_color="white", font_size=12),
-    )
-
-    return dbc.Card([
-        _pretty_header(
-            "Perfil multidimensional por área de investigación",
-            "Compara siempre las 3 áreas con los filtros de período/tipo/cuartil. "
-            "Cada eje se normaliza por el máximo entre áreas (1.0 = área líder del eje). "
-            "Volumen = publicaciones · Impacto = citas/publicación · Calidad = % Q1+Q2 · "
-            "h-index = h-index del área calculado del período · "
-            "Tendencia = pubs último trienio / trienio anterior",
-        ),
-        dbc.CardBody(html.Div(
-            dcc.Graph(figure=fig, config={"displayModeBar": False}),
-            className="plot-shell",
-        )),
-    ], className="pretty-card plot-card h-100")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _pretty_header(title: str, subtitle: str) -> dbc.CardHeader:
-    return dbc.CardHeader(html.Div([
-        html.H5(title, className="card-title-main"),
-        html.P(subtitle, className="card-title-sub"),
-    ], className="card-title-block"))
-
-
-def _card_vacia(title: str, message: str) -> dbc.Card:
-    return dbc.Card([
-        _pretty_header(title, "Estado del componente"),
-        dbc.CardBody(html.Div([
-            html.Div("Sin datos disponibles", className="empty-state-title"),
-            html.P(message, className="empty-state-text"),
-        ], className="empty-state")),
-    ], className="pretty-card")

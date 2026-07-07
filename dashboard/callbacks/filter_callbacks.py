@@ -795,99 +795,14 @@ def _build_benchmarking_data(
     tipos: list[str],
     cuartiles: Optional[list[str]] = None,
 ) -> dict:
-    """Ranking de profesores + radar comparativo de las tres áreas.
+    """Datos de la vista Rankings: comparativa de profesores para el ranking.
 
-    Radar — definiciones de las 5 dimensiones (valores crudos):
-
-    - **Volumen**: número de publicaciones únicas del área en el período
-      filtrado.
-    - **Impacto**: citas por publicación (``suma de cited_by_count /
-      publicaciones``) en el período filtrado.  Se usa el promedio y no el
-      total para no volver a premiar el tamaño del área (eso ya lo mide
-      Volumen).
-    - **Calidad**: proporción de publicaciones en revistas Q1 o Q2 (SJR del
-      año de publicación) sobre el total del área, incluyendo las que no
-      tienen cuartil ("Sin dato").
-    - **h-index**: h-index del área calculado por sort de citas sobre sus
-      publicaciones filtradas (``h = max{i : c(i) >= i}`` con las citas en
-      orden descendente).  Reacciona a los filtros de período/tipo/cuartil.
-      No se usa el h-index del perfil Scopus.
-    - **Tendencia**: publicaciones del último trienio [hasta-2, hasta]
-      dividido por las del trienio anterior [hasta-5, hasta-3].
-      1.0 = producción estable; >1 crecimiento; <1 decrecimiento.
-      Si el trienio anterior es 0, se usa 1 como denominador.
-
-    Normalización: cada dimensión se divide por el MÁXIMO entre las tres
-    áreas, quedando en [0, 1].  Por construcción, el área líder de cada
-    dimensión marca exactamente 1.0 — que un área salga en 1 en varios ejes
-    significa que lidera esas dimensiones, no que haya un error.  Se eligió
-    esta normalización (y no que las áreas sumen 1 por eje) porque conserva
-    los cocientes entre áreas, no depende del número de áreas y hace legible
-    el radar: 1 = mejor área del eje.
-
-    El radar SIEMPRE compara las tres áreas de la División (aplicando los
-    filtros de período/tipo/cuartil).  Antes se calculaba solo sobre el área
-    o profesor seleccionado, y con un único polígono la normalización por
-    máximo lo dejaba todo en 1.0 (caso degenerado sin información).
+    El radar "Perfil multidimensional por área" se retiró de la vista el
+    2026-07-07 (las fórmulas de sus dimensiones quedan en el historial de
+    ``docs/definiciones_indicadores.md``).
     """
     comparativa = _build_profesor_comparativa(departamento_id, profesor_id, anios, tipos, cuartiles)
-    # Contextos de TODAS las áreas para el radar (ignora área/profesor
-    # seleccionados; el radar es comparativo por naturaleza).
-    contexts = _get_department_contexts(None, None, anios, tipos, cuartiles)
-
-    anio_max      = _safe_year_range(anios)[1]
-    anio_rec_min  = anio_max - 2
-    anio_prev_min = anio_rec_min - 3
-    anio_prev_max = anio_rec_min - 1
-
-    dimensiones = ["Volumen", "Impacto", "Calidad", "h-index", "Tendencia"]
-    dept_names, raw_vals = [], []
-
-    for ctx in contexts:
-        df  = ctx["df"]
-        vol = int(df["id_publicacion"].nunique()) if not df.empty else 0
-        citas = int(df["cited_by_count"].fillna(0).sum()) if not df.empty else 0
-        imp = citas / vol if vol > 0 else 0.0  # citas por publicación
-
-        if not df.empty and "cuartil_sjr" in df.columns:
-            tot = len(df)
-            cal = df["cuartil_sjr"].isin(["Q1", "Q2"]).sum() / tot if tot > 0 else 0.0
-        else:
-            cal = 0.0
-
-        # h-index del área por sort de citas de sus publicaciones filtradas.
-        h_area = metrics.calcular_h_index_desde_publicaciones(df)
-
-        # La dimensión "Colaboración" se eliminó del radar (salía en blanco y
-        # deformaba el polígono). Se conserva el resto: Volumen, Impacto,
-        # Calidad, h-index y Tendencia.
-        if not df.empty and "anio_publicacion" in df.columns:
-            rec  = len(df[df["anio_publicacion"] >= anio_rec_min])
-            prev = len(df[df["anio_publicacion"].between(anio_prev_min, anio_prev_max)])
-            tend = rec / max(prev, 1)
-        else:
-            tend = 0.0
-
-        raw_vals.append([vol, imp, cal, h_area, tend])
-        dept_names.append(ctx["departamento"])
-
-    if raw_vals:
-        arr = pd.DataFrame(raw_vals, columns=dimensiones)
-        for col in dimensiones:
-            mx = arr[col].max()
-            arr[col] = arr[col] / mx if mx > 0 else 0.0
-        dept_vals = arr.round(4).values.tolist()
-    else:
-        dept_vals = []
-
-    radar = {
-        "departamentos": dept_names,
-        "dimensiones":   dimensiones,
-        "valores":       dept_vals,
-        "crudos":        raw_vals,
-    }
-
-    return {"ranking": comparativa, "radar": radar}
+    return {"ranking": comparativa}
 
 
 def _build_matching_data() -> dict:
@@ -1537,7 +1452,12 @@ def _update_ranking_table(sort_by, data):
 
 
 # ---------------------------------------------------------------------------
-# Callback: clic en nombre de profesor en tabla de ranking → navegar a perfil
+# Callback: acción de detalle en las tablas de ranking → navegar a perfil
+#
+# Dos patrones porque las pestañas inactivas conservan su contenido en el DOM
+# (no_update): el nombre-enlace del Resumen ("prof-ranking-link") y el botón
+# de detalle de Rankings ("prof-detail-btn") deben tener IDs distintos aunque
+# apunten al mismo profesor.
 # ---------------------------------------------------------------------------
 
 
@@ -1545,9 +1465,10 @@ def _update_ranking_table(sort_by, data):
     Output("store-active-view", "data", allow_duplicate=True),
     Output("filter-profesor",   "value", allow_duplicate=True),
     Input({"type": "prof-ranking-link", "index": ALL}, "n_clicks"),
+    Input({"type": "prof-detail-btn",   "index": ALL}, "n_clicks"),
     prevent_initial_call=True,
 )
-def _navigate_to_professor(n_clicks_list):
+def _navigate_to_professor(n_clicks_list, n_clicks_btns):
     import json
 
     ctx = callback_context

@@ -97,50 +97,13 @@ cobertura `cobertura_sjr`).
 - Tamaño del nodo = h-index del profesor calculado por sort sobre las
   publicaciones visibles con los filtros activos.
 
-## Radar "Perfil multidimensional por área" (vista Rankings)
+## Radar "Perfil multidimensional por área" — retirado (2026-07-07)
 
-Compara **siempre** las tres áreas de la División aplicando los filtros de
-período/tipo/cuartil (ignora la selección de Área/Profesor: un radar de una
-sola área es degenerado — todo quedaría en 1.0).
-
-Valores crudos por área (sobre publicaciones únicas del área):
-
-| Dimensión | Fórmula | Sensible a filtros |
-|---|---|---|
-| **Volumen** | nº de publicaciones únicas en el período | período/tipo/cuartil |
-| **Impacto** | `Σ cited_by_count / nº publicaciones` (citas por publicación) | período/tipo/cuartil |
-| **Calidad** | proporción de publicaciones en revistas Q1 o Q2 (SJR del año de publicación) sobre el total del área, incluyendo "Sin dato" en el denominador | período/tipo/cuartil |
-| **h-index** | h-index del área calculado por sort (`h = max{i : c(i) ≥ i}`) sobre las publicaciones únicas del área que pasan los filtros | período/tipo/cuartil |
-| **Tendencia** | `pubs [hasta−2, hasta] / max(pubs [hasta−5, hasta−3], 1)` — trienio reciente sobre trienio anterior; 1.0 = estable | período/tipo/cuartil |
-
-Notas de diseño:
-
-- **Impacto usa citas por publicación**, no citas totales: el tamaño del
-  área ya lo mide Volumen; usar totales en ambas dimensiones duplicaría el
-  peso del tamaño y hacía que el área más grande saturara el radar.
-- **Tendencia** necesita al menos 6 años en el rango Desde–Hasta para que
-  ambos trienios estén completos; con rangos más cortos la comparación es
-  parcial.
-
-### Normalización
-
-Cada dimensión se divide por el **máximo entre las tres áreas**:
-
-```
-valor_normalizado(área, dim) = valor_crudo(área, dim) / max(valor_crudo(·, dim))
-```
-
-- Rango [0, 1] por eje; **el área líder de cada eje marca exactamente 1.0**.
-  Que un área aparezca en 1.0 en varios ejes significa que lidera esas
-  dimensiones (p. ej., sin filtros, Física y Geociencias lidera Volumen,
-  Impacto, Calidad y h-index), no que haya un error.
-- Se descartó la alternativa "las áreas suman 1 por eje" (normalización por
-  participación): haría que los valores dependieran del número de áreas,
-  comprimiría las diferencias (tres áreas parecidas quedarían todas ≈ 0.33)
-  y el radar nunca alcanzaría 1. La normalización por máximo conserva los
-  cocientes entre áreas (si A tiene el doble que B, se ve el doble) y tiene
-  lectura directa: 1 = mejor área del eje.
-- El hover del radar muestra el valor normalizado y el valor real crudo.
+El radar comparativo por área se retiró de la vista Rankings; la vista
+muestra únicamente el ranking de profesores a ancho completo, con la acción
+"Ver perfil" por fila. Las definiciones de sus cinco dimensiones (Volumen,
+Impacto, Calidad, h-index, Tendencia) y la normalización por máximo quedan
+en el historial de git de este documento por si el componente se reintroduce.
 
 ## KPIs (tarjetas superiores)
 
