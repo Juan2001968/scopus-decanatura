@@ -88,8 +88,6 @@ def layout_profesor(data: Optional[dict] = None) -> html.Div:
             ], className="g-3 mb-3"),
             # Tabla de publicaciones mejorada
             _card_publicaciones(publicaciones),
-            # Co-autores frecuentes
-            _card_coautores(data.get("coautores_frecuentes", pd.DataFrame())),
         ], className="page-section section-stack"),
     ])
 
@@ -321,60 +319,6 @@ def _card_publicaciones(df: pd.DataFrame) -> dbc.Card:
             bordered=False, hover=True, striped=False,
             responsive=True, size="sm", className="mb-0 align-middle",
         ),
-    ], className="pretty-card table-card")
-
-
-# ---------------------------------------------------------------------------
-# Tabla: Co-autores frecuentes
-# ---------------------------------------------------------------------------
-
-def _card_coautores(df: pd.DataFrame) -> dbc.Card:
-    if df is None or df.empty:
-        # TODO: query co_autores_frecuentes — requiere join publicacion_autor con afiliaciones externas
-        return dbc.Card([
-            html.Div([
-                html.Div([
-                    html.H5("Co-autores Frecuentes", className="table-toolbar-title"),
-                    html.P("Colaboradores con mayor número de publicaciones compartidas.",
-                           className="table-toolbar-subtitle"),
-                ]),
-            ], className="table-toolbar"),
-            dbc.CardBody(html.Div([
-                html.Div("Tabla pendiente de implementación", className="empty-state-title"),
-                html.P(
-                    "Requiere query de co_autores_frecuentes con afiliaciones. "
-                    "Ver: TODO en filter_callbacks._build_profesor_data()",
-                    className="empty-state-text",
-                ),
-            ], className="empty-state")),
-        ], className="pretty-card table-card")
-
-    col_map = {
-        "coautor":               "Co-autor",
-        "afiliacion":            "Afiliación",
-        "publicaciones_juntas":  "Pubs. compartidas",
-        "citas_conjuntas":       "Citas conjuntas",
-    }
-    cols_ok = [c for c in col_map if c in df.columns]
-    work    = df[cols_ok].head(10).copy()
-
-    header = html.Thead(html.Tr([html.Th(col_map[c]) for c in cols_ok]))
-    rows = [
-        html.Tr([
-            html.Td(str(row.get(c, "—")),
-                    style={"textAlign": "right"} if c in ("publicaciones_juntas", "citas_conjuntas") else {})
-            for c in cols_ok
-        ])
-        for _, row in work.iterrows()
-    ]
-
-    return dbc.Card([
-        html.Div([
-            html.H5("Co-autores Frecuentes", className="table-toolbar-title"),
-            html.P("Top 10 colaboradores por publicaciones compartidas.", className="table-toolbar-subtitle"),
-        ], className="table-toolbar"),
-        dbc.Table([header, html.Tbody(rows)],
-                  bordered=False, hover=True, size="sm", className="mb-0 align-middle"),
     ], className="pretty-card table-card")
 
 

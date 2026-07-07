@@ -425,7 +425,6 @@ def _build_profesor_data(
         "distribucion_tipos":     metrics.calcular_distribucion_tipos(df),
         "distribucion_cuartiles": metrics.calcular_distribucion_cuartiles(df),
         "evolucion_anual":        metrics.calcular_citas_por_anio(df),
-        # TODO: "coautores_frecuentes": queries.get_coautores_frecuentes(profesor_id)
     }
 
 
