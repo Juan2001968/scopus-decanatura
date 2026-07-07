@@ -183,28 +183,15 @@ def _get_profesor_row(profesor_id: Optional[int]) -> Optional[pd.Series]:
     return row.iloc[0]
 
 
-def _get_context_h_index(
-    departamento_id: Optional[int],
-    profesor_id: Optional[int],
-) -> Optional[float]:
-    if profesor_id is not None:
-        prof_row = _get_profesor_row(profesor_id)
-        if prof_row is None:
-            return None
-        value = prof_row.get("h_index")
-        if pd.isna(value):
-            return None
-        return _safe_int(value)
-
-    df_prof = _get_profesores_df(departamento_id=departamento_id)
-    if df_prof.empty or "h_index" not in df_prof.columns:
-        return None
-
-    h_vals = pd.to_numeric(df_prof["h_index"], errors="coerce").dropna()
-    if h_vals.empty:
-        return None
-
-    return round(float(h_vals.mean()), 1)
+# NOTA h-index: todo h-index mostrado en el dashboard se CALCULA por
+# ordenamiento de citas sobre las publicaciones que pasan los filtros activos
+# (metrics.calcular_h_index_desde_publicaciones):
+#
+#   c(1) >= c(2) >= ... >= c(n)   (citas por publicación, orden descendente)
+#   h = max { i : c(i) >= i }
+#
+# El h-index del perfil Scopus (columna profesor.h_index) ya NO se muestra;
+# solo se conserva en BD como referencia.
 
 
 def _fetch_publicaciones(
@@ -368,7 +355,7 @@ def _build_tabla_departamentos(
 ) -> pd.DataFrame:
     cols = [
         "nombre_departamento", "profesores", "publicaciones_total",
-        "publicaciones_3_anios", "citas_totales", "h_index_promedio", "sjr_promedio",
+        "publicaciones_3_anios", "citas_totales", "h_index_area", "sjr_promedio",
     ]
     rows: list[dict] = []
 
@@ -378,13 +365,10 @@ def _build_tabla_departamentos(
         df    = ctx["df"]
 
         if profesor_id is not None:
-            n_profesores     = 1
-            h_index_promedio = _get_context_h_index(did, profesor_id)
+            n_profesores = 1
         else:
             profs_df = _get_profesores_df(departamento_id=did)
             n_profesores = len(profs_df)
-            h_vals = pd.to_numeric(profs_df.get("h_index"), errors="coerce").dropna()
-            h_index_promedio = round(float(h_vals.mean()), 1) if not h_vals.empty else None
 
         fuente_stats = metrics.calcular_metricas_fuente_promedio(df)
 
@@ -394,7 +378,9 @@ def _build_tabla_departamentos(
             "publicaciones_total": metrics.contar_publicaciones(df),
             "publicaciones_3_anios": metrics.contar_publicaciones_ventana(df),
             "citas_totales":       int(df["cited_by_count"].fillna(0).sum()) if not df.empty else 0,
-            "h_index_promedio":    h_index_promedio,
+            # h-index del ámbito calculado por sort de citas de sus
+            # publicaciones filtradas (coincide con el KPI "H-index Depto.").
+            "h_index_area":        metrics.calcular_h_index_desde_publicaciones(df),
             "sjr_promedio":        fuente_stats.get("sjr_promedio", 0.0),
         })
 
@@ -417,20 +403,23 @@ def _build_profesor_data(
 ) -> dict:
     prof_row = _get_profesor_row(profesor_id)
 
+    df = _fetch_publicaciones(departamento_id, profesor_id, anios, tipos, cuartiles)
+
     info = {
         "nombre":      prof_row.get("nombre_normalizado", "Profesor") if prof_row is not None else "Profesor",
         "orcid":       prof_row.get("orcid")                          if prof_row is not None else None,
         "departamento":prof_row.get("nombre_departamento", "")        if prof_row is not None else "",
-        "h_index":     prof_row.get("h_index")                        if prof_row is not None else None,
+        # h-index calculado por sort de citas sobre las publicaciones del
+        # período filtrado (no el h-index del perfil Scopus).
+        "h_index":     metrics.calcular_h_index_desde_publicaciones(df),
         "id_profesor": profesor_id,
     }
-
-    df = _fetch_publicaciones(departamento_id, profesor_id, anios, tipos, cuartiles)
 
     return {
         "info":                   info,
         "error":                  _df_error(df),
-        "kpis":                   metrics.generar_kpis_resumen(df, h_index=_get_context_h_index(departamento_id, profesor_id)),
+        # h_index=None -> generar_kpis_resumen lo calcula desde el df filtrado.
+        "kpis":                   metrics.generar_kpis_resumen(df, h_index=None),
         "publicaciones":          df,
         "top_fuentes":            _build_top_fuentes_df(df, top_n=10),
         "distribucion_tipos":     metrics.calcular_distribucion_tipos(df),
@@ -498,7 +487,9 @@ def _build_profesor_comparativa(
             "departamento":        prof.get("nombre_departamento", ""),
             "publicaciones_total": metrics.contar_publicaciones(df_prof),
             "citas_totales":       int(df_prof["cited_by_count"].fillna(0).sum()) if not df_prof.empty else 0,
-            "h_index":             prof.get("h_index"),
+            # h-index calculado por sort de citas del período filtrado
+            # (no el h-index del perfil Scopus).
+            "h_index":             metrics.calcular_h_index_desde_publicaciones(df_prof),
             "pct_q1q2":            pct,
         })
 
@@ -745,6 +736,23 @@ def _build_red_coautoria(
         )
         profesores = profesores[profesores["id_profesor"].isin(participantes)]
 
+    # Tamaño de nodo = h-index calculado por sort de citas sobre las
+    # publicaciones visibles con los filtros activos (se reemplaza el
+    # h-index del perfil Scopus que trae get_profesores).
+    if not profesores.empty:
+        citas_prof = links.merge(
+            base_df[["id_publicacion", "cited_by_count"]].drop_duplicates("id_publicacion"),
+            on="id_publicacion", how="left",
+        )
+        h_calc = (
+            citas_prof.groupby("id_profesor")["cited_by_count"]
+            .apply(lambda s: metrics.calcular_h_index_desde_citas(s.tolist()))
+        )
+        profesores = profesores.copy()
+        profesores["h_index"] = (
+            profesores["id_profesor"].map(h_calc).fillna(0).astype(int)
+        )
+
     return coautoria, profesores
 
 
@@ -800,9 +808,10 @@ def _build_benchmarking_data(
     - **Calidad**: proporción de publicaciones en revistas Q1 o Q2 (SJR del
       año de publicación) sobre el total del área, incluyendo las que no
       tienen cuartil ("Sin dato").
-    - **h-index**: promedio del h-index Scopus de los profesores del área.
-      Es una foto del perfil del autor: NO reacciona a los filtros de
-      período/tipo/cuartil.
+    - **h-index**: h-index del área calculado por sort de citas sobre sus
+      publicaciones filtradas (``h = max{i : c(i) >= i}`` con las citas en
+      orden descendente).  Reacciona a los filtros de período/tipo/cuartil.
+      No se usa el h-index del perfil Scopus.
     - **Tendencia**: publicaciones del último trienio [hasta-2, hasta]
       dividido por las del trienio anterior [hasta-5, hasta-3].
       1.0 = producción estable; >1 crecimiento; <1 decrecimiento.
@@ -846,10 +855,8 @@ def _build_benchmarking_data(
         else:
             cal = 0.0
 
-        profs_df = _get_profesores_df(departamento_id=ctx["id_departamento"])
-        h_vals   = pd.to_numeric(profs_df.get("h_index", pd.Series(dtype=float)),
-                                 errors="coerce").dropna()
-        h_mean   = float(h_vals.mean()) if not h_vals.empty else 0.0
+        # h-index del área por sort de citas de sus publicaciones filtradas.
+        h_area = metrics.calcular_h_index_desde_publicaciones(df)
 
         # La dimensión "Colaboración" se eliminó del radar (salía en blanco y
         # deformaba el polígono). Se conserva el resto: Volumen, Impacto,
@@ -861,7 +868,7 @@ def _build_benchmarking_data(
         else:
             tend = 0.0
 
-        raw_vals.append([vol, imp, cal, h_mean, tend])
+        raw_vals.append([vol, imp, cal, h_area, tend])
         dept_names.append(ctx["departamento"])
 
     if raw_vals:
@@ -953,9 +960,9 @@ def _compute_universidad_kpis() -> dict:
     Division.  Por diseno, estos totales son fijos y NO reaccionan a los
     filtros del tablero.
 
-    El H-index de Universidad es *publication-based*: se calcula a partir de
-    los ``cited_by_count`` de todas las publicaciones (metodologia distinta al
-    H-index de la Division, que promedia el de los profesores).
+    El H-index de Universidad se calcula por sort de citas sobre todas las
+    publicaciones (``cited_by_count``), la misma metodologia que usan ahora
+    todos los niveles (profesor/area/Division) sobre su conjunto filtrado.
 
     El resultado se memoiza tras la primera consulta exitosa (los datos son
     constantes durante la vida del proceso); un resultado vacio/transitorio

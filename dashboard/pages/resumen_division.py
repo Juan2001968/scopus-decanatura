@@ -388,7 +388,7 @@ def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
         "publicaciones_total":   "Publicaciones",
         "publicaciones_3_anios": "2014–2025",
         "citas_totales":         "Citas",
-        "h_index_promedio":      "H-index prom.",
+        "h_index_area":          "H-index",
         "sjr_promedio":          "SJR prom.",
     }
 
@@ -397,16 +397,17 @@ def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
     ]))
 
     rows = []
-    totals = {c: 0 for c in col_map if c != "nombre_departamento"}
+    # Sin fila de total para h-index y SJR: no son aditivos entre áreas.
+    totals = {c: 0 for c in col_map
+              if c not in ("nombre_departamento", "h_index_area", "sjr_promedio")}
     for _, row in df.iterrows():
         cells = []
         for col in col_map:
             val = row.get(col, "—")
             if isinstance(val, float):
-                fmt = (f"{val:.2f}" if col in ("h_index_promedio", "sjr_promedio")
-                       else f"{val:,.0f}")
+                fmt = (f"{val:.2f}" if col == "sjr_promedio" else f"{val:,.0f}")
                 cells.append(html.Td(fmt, style={"textAlign": "right"} if col != "nombre_departamento" else {}))
-                if col in totals and col not in ("h_index_promedio", "sjr_promedio"):
+                if col in totals:
                     totals[col] += val
             elif isinstance(val, int):
                 cells.append(html.Td(f"{val:,}", style={"textAlign": "right"}))
@@ -432,7 +433,9 @@ def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
         html.Div([
             html.Div([
                 html.H5("Producción por Área de investigación", className="table-toolbar-title"),
-                html.P("Indicadores consolidados por unidad académica con totales.", className="table-toolbar-subtitle"),
+                html.P("Indicadores consolidados por unidad académica con totales · "
+                       "H-index del área calculado del período (mayor h con h publicaciones de ≥ h citas)",
+                       className="table-toolbar-subtitle"),
             ]),
         ], className="table-toolbar"),
         dbc.Table(

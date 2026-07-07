@@ -211,7 +211,8 @@ def _card_red_coautoria(
 
     n_copubs = int(coautoria["n_copubs"].sum()) if "n_copubs" in coautoria.columns else 0
     subtitulo = (
-        f"Tamaño = h-index · {n_dibujadas} pares con co-autoría · "
+        f"Tamaño = h-index calculado sobre las publicaciones visibles · "
+        f"{n_dibujadas} pares con co-autoría · "
         f"{n_copubs} co-publicaciones en el período/filtros activos"
     )
     return dbc.Card([

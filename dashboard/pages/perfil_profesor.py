@@ -104,7 +104,9 @@ def _header_profesor(info: dict) -> dbc.Card:
     if depto:
         chips.append(html.Span(depto, className="professor-chip"))
     if h_idx is not None:
-        chips.append(html.Span(f"h-index: {h_idx}", className="professor-chip"))
+        # h-index calculado por sort de citas sobre las publicaciones del
+        # período filtrado (no es el h-index del perfil Scopus).
+        chips.append(html.Span(f"h-index (período): {h_idx}", className="professor-chip"))
     if orcid:
         chips.append(
             html.A(f"ORCID: {orcid}", href=f"https://orcid.org/{orcid}",

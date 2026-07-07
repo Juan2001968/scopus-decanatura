@@ -104,10 +104,12 @@ def _card_autocitas(kpis: dict) -> dbc.Card:
 
 
 def _card_h_index(kpis: dict) -> dbc.Card:
+    # h-index calculado por sort de citas de las publicaciones filtradas:
+    # h = mayor i tal que la i-ésima publicación más citada tiene >= i citas.
     return create_kpi_card(
         title=kpis.get("h_index_label", "H-index División"),
         value=_format_number(kpis.get("h_index")),
-        subtitle="Período filtrado",
+        subtitle="h pubs con ≥ h citas (período)",
         color="success",
         icon_class="bi-trophy",
     )
@@ -157,9 +159,9 @@ def _card_citas_div(kpis: dict) -> dbc.Card:
 
 
 def _card_h_index_uni(kpis: dict) -> dbc.Card:
-    # H-index institucional *publication-based*: se calcula sobre los
-    # ``cited_by_count`` de TODAS las publicaciones de Uninorte (tabla
-    # ``publicacion`` completa). El dict proviene de
+    # H-index institucional calculado por sort de citas sobre TODAS las
+    # publicaciones de Uninorte (tabla ``publicacion`` completa) — misma
+    # fórmula que el resto de niveles. El dict proviene de
     # ``_compute_universidad_kpis``; su clave ``h_index`` ya es el valor de la
     # Universidad, distinto del H-index de la División.
     return create_kpi_card(
@@ -224,7 +226,7 @@ def create_kpi_row(kpis: dict) -> dbc.Row:
     1. Publicaciones 2014–2025
     2. Total citas
     3. Citas excluyendo autocitas
-    4. H-index promedio División
+    4. H-index del ámbito (calculado por sort de citas del período)
     5. % publicaciones Q1 o Q2
     6. Profesores activos
     """

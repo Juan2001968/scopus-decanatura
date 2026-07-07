@@ -28,6 +28,27 @@ contradice lo aquí descrito, el gráfico está mal.
   área: las co-autorías internas se contarían k veces. Los agregados por
   área siempre se calculan sobre publicaciones únicas, nunca sumando la
   tabla por profesor.
+- **h-index (único método en todo el dashboard)**: se calcula por
+  ordenamiento de citas sobre las publicaciones del ámbito (profesor, área,
+  División o Universidad) **que pasan los filtros activos**
+  (`metrics.calcular_h_index_desde_citas`):
+
+  ```
+  1. Tomar cited_by_count de cada publicación del conjunto filtrado
+     (nulos = 0) y ordenarlas de mayor a menor: c(1) ≥ c(2) ≥ ... ≥ c(n).
+  2. h = max { i : c(i) ≥ i }
+     (la posición más alta i cuya publicación tiene al menos i citas;
+      equivalente: existen h publicaciones con ≥ h citas cada una).
+  ```
+
+  Ejemplo: citas ordenadas [30, 12, 7, 4, 2] → c(1)=30≥1, c(2)=12≥2,
+  c(3)=7≥3, c(4)=4≥4, c(5)=2<5 → **h = 4**.
+
+  El h-index del perfil Scopus (`profesor.h_index`) **ya no se muestra** en
+  ninguna vista; queda en la BD solo como referencia. Al filtrar por
+  período/tipo/cuartil, el h-index mostrado se recalcula sobre ese
+  subconjunto (por eso puede ser menor que el del perfil Scopus, que cubre
+  toda la carrera del autor).
 
 ## Impacto (citas) por profesor — scatter "Producción vs Impacto", ranking y perfil
 
@@ -36,11 +57,10 @@ contradice lo aquí descrito, el gráfico está mal.
 - `citas_totales` = `Σ cited_by_count` de esas mismas publicaciones.
 - `citas_por_pub` = `citas_totales / publicaciones_total` (tabla "Impacto
   por Cita Promedio"; requiere ≥ 3 publicaciones).
-- `h_index` = h-index del perfil Scopus del profesor
-  (`profesor.h_index`, snapshot). **No** se recalcula con los filtros: el
-  tamaño de burbuja del scatter y la columna del ranking son el valor
-  histórico del autor. (Verificado: para el corpus 2014–2025 coincide con
-  el h-index recalculado desde `cited_by_count` en los 54 profesores.)
+- `h_index` = h-index **calculado por sort** (ver fórmula en Convenciones)
+  sobre esas mismas publicaciones filtradas. El tamaño de burbuja del
+  scatter y la columna del ranking usan este valor recalculado; no se usa
+  el h-index del perfil Scopus.
 - Las tres vistas (scatter de Impacto, ranking de Rankings, KPIs del
   perfil) usan la misma función (`_build_profesor_comparativa` /
   `_fetch_publicaciones`), por lo que son idénticas por construcción.
@@ -74,7 +94,8 @@ cobertura `cobertura_sjr`).
   la División en las publicaciones filtradas).
 - Sin co-publicaciones para la combinación: se muestra un aviso con los
   filtros activos en lugar del grafo.
-- Tamaño del nodo = h-index Scopus del profesor (snapshot).
+- Tamaño del nodo = h-index del profesor calculado por sort sobre las
+  publicaciones visibles con los filtros activos.
 
 ## Radar "Perfil multidimensional por área" (vista Rankings)
 
@@ -89,7 +110,7 @@ Valores crudos por área (sobre publicaciones únicas del área):
 | **Volumen** | nº de publicaciones únicas en el período | período/tipo/cuartil |
 | **Impacto** | `Σ cited_by_count / nº publicaciones` (citas por publicación) | período/tipo/cuartil |
 | **Calidad** | proporción de publicaciones en revistas Q1 o Q2 (SJR del año de publicación) sobre el total del área, incluyendo "Sin dato" en el denominador | período/tipo/cuartil |
-| **h-index** | promedio del `profesor.h_index` (Scopus, snapshot) de los profesores del área | no (foto del perfil de autores) |
+| **h-index** | h-index del área calculado por sort (`h = max{i : c(i) ≥ i}`) sobre las publicaciones únicas del área que pasan los filtros | período/tipo/cuartil |
 | **Tendencia** | `pubs [hasta−2, hasta] / max(pubs [hasta−5, hasta−3], 1)` — trienio reciente sobre trienio anterior; 1.0 = estable | período/tipo/cuartil |
 
 Notas de diseño:
@@ -124,10 +145,10 @@ valor_normalizado(área, dim) = valor_crudo(área, dim) / max(valor_crudo(·, di
 ## KPIs (tarjetas superiores)
 
 - **Universidad del Norte**: toda la tabla `publicacion` (descarga por
-  AF-ID institucional), sin filtros; h-index *publication-based* (desde
-  `cited_by_count`). Constantes por diseño.
+  AF-ID institucional), sin filtros; h-index calculado por sort sobre todas
+  esas publicaciones. Constantes por diseño.
 - **División / Área / Profesor**: publicaciones únicas del alcance con los
   filtros activos; citas = `Σ cited_by_count`; % Q1+Q2 sobre el total
-  (incluye "Sin dato"); h-index de División/Área = promedio del h-index de
-  los profesores; h-index de la Universidad = publication-based (metodologías
-  distintas, señaladas en la etiqueta).
+  (incluye "Sin dato"); h-index = calculado por sort sobre las
+  publicaciones del alcance filtrado (misma fórmula en todos los niveles;
+  ver Convenciones).

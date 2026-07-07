@@ -74,7 +74,8 @@ _DEFAULT_SORT = "h_index"
 def ranking_caption(sort_by: str) -> str:
     """Subtítulo de la tarjeta del ranking según la métrica de orden."""
     label = _SORT_LABELS.get(sort_by, _SORT_LABELS[_DEFAULT_SORT])
-    return f"Ordenado por: {label}"
+    return (f"Ordenado por: {label} · h-index calculado del período "
+            "(mayor h con h publicaciones de ≥ h citas)")
 
 
 def build_ranking_table_body(df: pd.DataFrame, sort_by: str = _DEFAULT_SORT):
@@ -284,7 +285,8 @@ def _card_radar(radar: dict) -> dbc.Card:
             "Compara siempre las 3 áreas con los filtros de período/tipo/cuartil. "
             "Cada eje se normaliza por el máximo entre áreas (1.0 = área líder del eje). "
             "Volumen = publicaciones · Impacto = citas/publicación · Calidad = % Q1+Q2 · "
-            "h-index = promedio profesores · Tendencia = pubs último trienio / trienio anterior",
+            "h-index = h-index del área calculado del período · "
+            "Tendencia = pubs último trienio / trienio anterior",
         ),
         dbc.CardBody(html.Div(
             dcc.Graph(figure=fig, config={"displayModeBar": False}),

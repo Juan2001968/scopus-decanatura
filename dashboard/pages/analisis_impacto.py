@@ -250,7 +250,8 @@ def _card_mayor_impacto_cita_promedio(df: pd.DataFrame) -> dbc.Card:
         html.Div([
             html.Div([
                 html.H5("Profesores con Mayor Impacto por Cita Promedio", className="table-toolbar-title"),
-                html.P("Mínimo 3 publicaciones · ordenado por citas/publicación desc",
+                html.P("Mínimo 3 publicaciones · ordenado por citas/publicación desc · "
+                       "h-index calculado sobre las publicaciones del período",
                        className="table-toolbar-subtitle"),
             ]),
         ], className="table-toolbar"),
@@ -308,8 +309,9 @@ def _card_scatter_impacto(df: pd.DataFrame) -> dbc.Card:
     return dbc.Card([
         _pretty_header(
             "Producción vs Impacto por profesor",
-            "Citas = suma de citas de las publicaciones del profesor en el período filtrado · "
-            "tamaño = h-index Scopus (histórico) · líneas punteadas = medianas",
+            "Citas = suma de citas de las publicaciones del período filtrado · "
+            "tamaño = h-index calculado del período (mayor h con h publicaciones de ≥ h citas) · "
+            "líneas punteadas = medianas",
         ),
         dbc.CardBody(html.Div(dcc.Graph(figure=fig, config={"displayModeBar": False}), className="plot-shell")),
     ], className="pretty-card plot-card h-100")
