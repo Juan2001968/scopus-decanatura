@@ -444,6 +444,15 @@ def _build_resumen_data(
 
     return {
         "tabla_departamentos":        _build_tabla_departamentos(contexts, profesor_id),
+        # TOTAL de la tabla por área calculado sobre publicaciones ÚNICAS
+        # (base_df ya viene deduplicado por EXISTS): sumar las filas de área
+        # contaría dos veces las publicaciones con coautores de dos áreas.
+        # Mismas funciones de metrics que usan las celdas por área.
+        "totales_division": {
+            "publicaciones_total":   metrics.contar_publicaciones(base_df),
+            "publicaciones_3_anios": metrics.contar_publicaciones_ventana(base_df),
+            "citas_totales":         int(base_df["cited_by_count"].fillna(0).sum()) if not base_df.empty else 0,
+        },
         "evolucion_por_departamento": _build_evolucion_por_departamento(contexts),
         "distribucion_tipos":         metrics.calcular_distribucion_tipos(base_df),
         "distribucion_cuartiles":     metrics.calcular_distribucion_cuartiles(base_df),

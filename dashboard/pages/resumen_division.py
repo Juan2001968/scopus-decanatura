@@ -75,7 +75,7 @@ def layout_resumen(data: dict) -> html.Div:
             ], className="g-3 mb-3"),
             dbc.Row([
                 dbc.Col(_card_tipos(dist_tipos), md=5),
-                dbc.Col(_card_tabla_departamentos(tabla_deptos), md=7),
+                dbc.Col(_card_tabla_departamentos(tabla_deptos, data.get("totales_division")), md=7),
             ], className="g-3 mb-3"),
         ], className="page-section section-stack"),
     ])
@@ -378,7 +378,10 @@ def _card_tipos(df: pd.DataFrame) -> dbc.Card:
 # Tabla comparativa de departamentos
 # ---------------------------------------------------------------------------
 
-def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
+def _card_tabla_departamentos(
+    df: pd.DataFrame,
+    totales_division: dict | None = None,
+) -> dbc.Card:
     if df.empty:
         return _card_vacia("Comparativa áreas de investigación", "Sin información comparativa.")
 
@@ -416,6 +419,17 @@ def _card_tabla_departamentos(df: pd.DataFrame) -> dbc.Card:
             else:
                 cells.append(html.Td(val))
         rows.append(html.Tr(cells))
+
+    # La suma de las filas por área cuenta DOS veces las publicaciones con
+    # coautores de áreas distintas (11 pubs / 88 citas con los datos de
+    # 2026-07): el TOTAL de publicaciones y citas se toma del conjunto ÚNICO
+    # de la División (``totales_division``, calculado sobre el mismo base_df
+    # filtrado en _build_resumen_data). "profesores" sí es aditivo: cada
+    # profesor pertenece a UNA sola área (columna profesor.id_departamento).
+    if totales_division:
+        for key in ("publicaciones_total", "publicaciones_3_anios", "citas_totales"):
+            if key in totals and totales_division.get(key) is not None:
+                totals[key] = totales_division[key]
 
     # Fila de totales
     total_cells = [html.Td("TOTAL", style={"fontWeight": "700"})]
