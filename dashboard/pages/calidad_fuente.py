@@ -28,6 +28,12 @@ _COLORES_CUARTIL = {
 }
 _PILL = {"Q1": "pill-q1", "Q2": "pill-q2", "Q3": "pill-q3", "Q4": "pill-q4"}
 
+# OCULTO temporalmente: tabla "Publicaciones sin clasificar / Sin métricas".
+# Poner en True para volver a mostrarla al final de la vista (la tarjeta
+# _card_sin_clasificar y su query en filter_callbacks quedan intactas; el
+# cálculo de los datos también se condiciona a este flag).
+SHOW_SIN_CLASIFICAR = False
+
 
 def _apply_layout(fig, height=380):
     fig.update_layout(
@@ -77,8 +83,10 @@ def layout_fuentes(data: dict) -> html.Div:
             # Top 20 revistas
             _card_tabla_fuentes(top_fuentes),
 
-            # Publicaciones sin clasificar
-            _card_sin_clasificar(data.get("publicaciones_sin_clasificar", pd.DataFrame())),
+            # Publicaciones sin clasificar — OCULTO temporalmente, ver flag
+            # SHOW_SIN_CLASIFICAR (la tarjeta se conserva abajo).
+            *([_card_sin_clasificar(data.get("publicaciones_sin_clasificar", pd.DataFrame()))]
+              if SHOW_SIN_CLASIFICAR else []),
 
         ], className="page-section section-stack"),
     ])

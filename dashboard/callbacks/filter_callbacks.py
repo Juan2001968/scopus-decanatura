@@ -23,7 +23,7 @@ from dashboard.pages.benchmarking import (
     layout_benchmarking,
     ranking_caption,
 )
-from dashboard.pages.calidad_fuente import layout_fuentes
+from dashboard.pages.calidad_fuente import SHOW_SIN_CLASIFICAR, layout_fuentes
 from dashboard.pages.calidad_matching import layout_matching
 from dashboard.pages.colaboracion_tematicas import layout_colaboracion
 from dashboard.pages.explorador_datos import layout_explorador
@@ -697,7 +697,12 @@ def _build_fuentes_data(
         "cuartiles_por_departamento":  _build_cuartiles_por_departamento(contexts),
         "top_fuentes":                 _build_top_fuentes_df(base_df, top_n=20),
         "sjr_por_departamento":        _build_sjr_por_departamento(contexts),
-        "publicaciones_sin_clasificar": _build_publicaciones_sin_clasificar(base_df),
+        # OCULTO temporalmente: la tabla no se muestra y su cálculo (2 queries
+        # extra) se omite mientras SHOW_SIN_CLASIFICAR sea False.
+        "publicaciones_sin_clasificar": (
+            _build_publicaciones_sin_clasificar(base_df)
+            if SHOW_SIN_CLASIFICAR else pd.DataFrame()
+        ),
     }
 
 
@@ -998,10 +1003,10 @@ def _make_kpi_block(title: str, subtitle: str, kpis: dict) -> html.Div:
     ])
 
 
-# Tarjetas de la fila "Indicadores · {área}": sin "Autocitas" (dato no
-# reproducible post-reparación del matching) ni "Profesores activos" (contaba
-# el roster completo del área, no los profesores con publicaciones).
-_AREA_CARDS = ["publicaciones", "citas", "h_index", "pct_q1q2"]
+# NOTA: las tarjetas "Autocitas" y "Profesores activos" están OCULTAS en
+# TODAS las filas de KPIs mediante los flags SHOW_AUTOCITAS y
+# SHOW_PROFESORES_ACTIVOS de dashboard/components/kpi_cards.py (el filtrado
+# ocurre dentro de create_kpi_row / create_kpi_row_custom).
 
 
 def _make_custom_kpi_block(
@@ -1269,11 +1274,10 @@ def update_dashboard_content(
             kpis_upper["h_index_label"] = f"H-index Depto.{suffix}"
             kpis_context = _compute_profesor_kpis(profesor_id, anios_value, tipos, cuartiles)
             kpis_context["h_index_label"] = f"H-index Profesor{suffix}"
-            upper_block = _make_custom_kpi_block(
+            upper_block = _make_kpi_block(
                 f"Indicadores · {dept_name}",
                 "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_upper,
-                cards=_AREA_CARDS,
             )
             context_block = _make_kpi_block(
                 f"Indicadores · {prof_name}",
@@ -1289,11 +1293,10 @@ def update_dashboard_content(
             kpis_dept = _compute_global_kpis(anios_value, tipos, cuartiles, departamento_id=departamento_id)
             kpis_dept["h_index_label"] = f"H-index Depto.{suffix}"
             upper_block = _make_division_summary_blocks(kpis_division, _compute_universidad_kpis())
-            context_block = _make_custom_kpi_block(
+            context_block = _make_kpi_block(
                 f"Indicadores · {dept_name}",
                 "Indicadores del área de investigación para el período y filtros activos.",
                 kpis_dept,
-                cards=_AREA_CARDS,
             )
 
         else:

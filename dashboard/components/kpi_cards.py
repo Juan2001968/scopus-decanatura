@@ -173,6 +173,35 @@ def _card_h_index_uni(kpis: dict) -> dbc.Card:
     )
 
 
+# ---------------------------------------------------------------------------
+# Flags de visibilidad de tarjetas
+#
+# OCULTO temporalmente: con el flag en False la tarjeta NO se renderiza en
+# NINGUNA fila de KPIs (área, profesor, División, Universidad, Perfil
+# Profesor) y el grid se reajusta solo. Para reactivarla en todas las vistas
+# basta poner el flag en True; los constructores (_card_autocitas,
+# _card_profesores) y las claves del registro quedan intactos.
+#
+# Motivo (auditoría 2026-07-06, AUDITORIA.md):
+# - Autocitas: se alimenta de autocitas_v1.csv, generado ANTES de la
+#   reparación del matching; el valor no es reproducible (hallazgo 3).
+# - Profesores activos: cuenta el roster completo del área, no los
+#   profesores con >=1 publicación que anuncia el subtítulo (hallazgo 6).
+# ---------------------------------------------------------------------------
+SHOW_AUTOCITAS = False
+SHOW_PROFESORES_ACTIVOS = False
+
+
+def _hidden_card_keys() -> set[str]:
+    """Claves de tarjeta desactivadas por los flags de visibilidad."""
+    hidden: set[str] = set()
+    if not SHOW_AUTOCITAS:
+        hidden.add("autocitas")
+    if not SHOW_PROFESORES_ACTIVOS:
+        hidden.add("profesores")
+    return hidden
+
+
 # Registro de tarjetas disponibles por clave, para componer filas a la carta.
 _CARD_BUILDERS: dict[str, Callable[[dict], dbc.Card]] = {
     # Tarjetas "clásicas" (orden por defecto de create_kpi_row)
@@ -203,6 +232,9 @@ def create_kpi_row_custom(kpis: dict, cards: list[str]) -> dbc.Row:
     columnas se reparte automáticamente para llenar la fila (12 columnas
     Bootstrap), manteniendo el mismo estilo visual de las tarjetas.
     """
+    # OCULTO temporalmente: descartar tarjetas desactivadas por flag
+    # (ver SHOW_AUTOCITAS / SHOW_PROFESORES_ACTIVOS arriba).
+    cards = [key for key in cards if key not in _hidden_card_keys()]
     n = len(cards) or 1
     # Reparte las 12 columnas; nunca menos de 2 (≥6 tarjetas) ni más de 12.
     xl = min(12, max(2, 12 // n))
@@ -229,9 +261,9 @@ def create_kpi_row(kpis: dict) -> dbc.Row:
     4. H-index del ámbito (calculado por sort de citas del período)
     5. % publicaciones Q1 o Q2
     6. Profesores activos
+
+    Las tarjetas desactivadas por flag (SHOW_AUTOCITAS,
+    SHOW_PROFESORES_ACTIVOS) se omiten y el grid se reajusta; delega en
+    :func:`create_kpi_row_custom`, que aplica el filtrado.
     """
-    cols = [
-        dbc.Col(_CARD_BUILDERS[key](kpis), xl=2, lg=4, md=4, sm=6, xs=12)
-        for key in _DEFAULT_CARDS
-    ]
-    return dbc.Row(cols, className="g-3 kpi-wrapper")
+    return create_kpi_row_custom(kpis, _DEFAULT_CARDS)
